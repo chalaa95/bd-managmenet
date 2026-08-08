@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Sales / POS - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header"><h1>🛒 Sales & Point of Sale</h1></div>
+
+<div class="pos-layout">
+    <div class="pos-products">
+        <div class="category-tabs">
+            <button class="tab-btn active" onclick="filter('all')">All</button>
+            <button class="tab-btn" onclick="filter('Food')">Food</button>
+            <button class="tab-btn" onclick="filter('Drinks')">Drinks</button>
+            <button class="tab-btn" onclick="filter('Desserts')">Desserts</button>
+        </div>
+        <div class="product-grid" id="productGrid">
+            {% for product in products %}
+            <div class="product-card" data-category="{{ product.category }}" onclick="addToCart({{ product.id }}, '{{ product.name }}', {{ product.price }})">
+                <div class="product-card-icon">🍽️</div>
+                <h4>{{ product.name }}</h4>
+                <p class="product-price">DT{{ "%.2f"|format(product.price) }}</p>
+                <p class="product-category">{{ product.category }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="pos-cart">
+        <div class="cart-header"><h3>📝 Current Order</h3></div>
+        <form action="/sales/create" method="POST" id="orderForm">
+            <div class="form-row">
+                <div class="form-group"><label>Table #</label><input type="text" name="table_number" required></div>
+                <div class="form-group"><label>Cashier</label><select name="cashier" required>
+                    {% for worker in workers %}<option value="{{ worker.name }}">{{ worker.name }}</option>{% endfor %}
+                </select></div>
+            </div>
+            <div class="form-group"><label>Payment Method</label><select name="payment_method">
+                <option value="Cash">💵 Cash</option>
+                <option value="Card">💳 Card</option>
+                <option value="Transfer">🏦 Transfer</option>
+            </select></div>
+
+            <div class="cart-items" id="cartItems"><p class="cart-empty">Click products to add them</p></div>
+
+            <!-- Discount Section -->
+            <div class="discount-section">
+                <label>Discount</label>
+                <div class="discount-row">
+                    <input type="number" name="discount_value" id="discountValue" step="0.01" min="0" value="0" placeholder="0" oninput="updateTotals()">
+                    <select name="discount_type" id="discountType" onchange="updateTotals()">
+                        <option value="fixed">DT (Fixed)</option>
+                        <option value="percent">% (Percent)</option>
+                    </select>
+                </div>
+                <div class="discount-preview" id="discountPreview"></div>
+            </div>
+
+            <div class="cart-totals">
+                <div class="total-row"><span>Subtotal:</span><span id="subtotal">DT0.00</span></div>
+                <div class="total-row discount-row-total"><span>Discount:</span><span id="discountDisplay">-DT0.00</span></div>
+                <div class="total-row total-grand"><span>Total:</span><span id="grandTotal">DT0.00</span></div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn" disabled>Complete Sale</button>
+        </form>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header"><h2>🕐 Today's Sales</h2></div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>Order #</th><th>Table</th><th>Total</th><th>Discount</th><th>Payment</th><th>Cashier</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for sale in recent_sales %}
+                <tr>
+                    <td><strong>{{ sale.order_number }}</strong></td>
+                    <td>Table {{ sale.table_number or '-' }}</td>
+                    <td class="cell-price">DT{{ "%.2f"|format(sale.total_amount) }}</td>
+                    <td class="cell-price text-muted">
+                        {% if sale.discount_type == 'percent' %}
+                            {{ "%.1f"|format(sale.discount_value or 0) }}% (DT{{ "%.2f"|format(sale.discount_amount or 0) }})
+                        {% else %}
+                            DT{{ "%.2f"|format(sale.discount_amount or sale.discount or 0) }}
+                        {% endif %}
+                    </td>
+                    <td>{{ sale.payment_method }}</td>
+                    <td>{{ sale.cashier_name or '-' }}</td>
+                    <td><a href="/sales/delete/{{ sale.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Delete?')">Delete</a></td>
+                </tr>
+                {% else %}<tr><td colspan="7" class="cell-empty">No sales today</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let cart = [];
+let subtotal = 0;
+
+function addToCart(id, name, price) {
+    const existing = cart.find(item => item.id === id);
+    if (existing) { existing.qty++; } else { cart.push({ id, name, price, qty: 1 }); }
+    renderCart();
+}
+
+function updateQty(index, delta) {
+    cart[index].qty += delta;
+    if (cart[index].qty <= 0) cart.splice(index, 1);
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cartItems');
+    const form = document.getElementById('orderForm');
+    form.querySelectorAll('.cart-input').forEach(el => el.remove());
+
+    if (cart.length === 0) {
+        container.innerHTML = '<p class="cart-empty">Click products to add them</p>';
+        document.getElementById('submitBtn').disabled = true;
+        subtotal = 0;
+        updateTotals();
+        return;
+    }
+
+    let html = '';
+    subtotal = 0;
+
+    cart.forEach((item, index) => {
+        const itemTotal = item.price * item.qty;
+        subtotal += itemTotal;
+        html += `<div class="cart-item"><div class="cart-item-info"><strong>${item.name}</strong><span>DT${item.price.toFixed(2)} each</span></div><div class="cart-item-qty"><button type="button" onclick="updateQty(${index}, -1)">−</button><span>${item.qty}</span><button type="button" onclick="updateQty(${index}, 1)">+</button></div><div class="cart-item-total">DT${itemTotal.toFixed(2)}</div></div>`;
+
+        const inputId = document.createElement('input');
+        inputId.type = 'hidden';
+        inputId.name = 'product_id[]';
+        inputId.value = item.id;
+        inputId.className = 'cart-input';
+        form.appendChild(inputId);
+
+        const inputQty = document.createElement('input');
+        inputQty.type = 'hidden';
+        inputQty.name = 'quantity[]';
+        inputQty.value = item.qty;
+        inputQty.className = 'cart-input';
+        form.appendChild(inputQty);
+    });
+
+    container.innerHTML = html;
+    document.getElementById('submitBtn').disabled = false;
+    updateTotals();
+}
+
+function updateTotals() {
+    const discountVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discountType = document.getElementById('discountType').value;
+
+    let discountAmount = 0;
+    if (discountType === 'percent') {
+        discountAmount = subtotal * (discountVal / 100);
+    } else {
+        discountAmount = discountVal;
+    }
+
+    if (discountAmount > subtotal) discountAmount = subtotal;
+    if (discountAmount < 0) discountAmount = 0;
+
+    let grand = subtotal - discountAmount;
+    if (grand < 0) grand = 0;
+
+    document.getElementById('subtotal').textContent = 'DT' + subtotal.toFixed(2);
+    document.getElementById('discountDisplay').textContent = '-DT' + discountAmount.toFixed(2);
+    document.getElementById('grandTotal').textContent = 'DT' + grand.toFixed(2);
+
+    // Show preview
+    const preview = document.getElementById('discountPreview');
+    if (discountType === 'percent' && discountVal > 0) {
+        preview.textContent = `${discountVal}% = -DT${discountAmount.toFixed(2)}`;
+    } else if (discountType === 'fixed' && discountVal > 0) {
+        const pct = subtotal > 0 ? ((discountVal / subtotal) * 100).toFixed(1) : 0;
+        preview.textContent = `DT${discountVal.toFixed(2)} = -${pct}%`;
+    } else {
+        preview.textContent = '';
+    }
+}
+
+function filter(category) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('.product-card').forEach(card => {
+        card.style.display = (category === 'all' || card.dataset.category === category) ? 'block' : 'none';
+    });
+}
+</script>
+{% endblock %}

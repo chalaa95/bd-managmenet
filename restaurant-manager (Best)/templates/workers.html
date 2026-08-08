@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Workers - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>👥 Workers & Staff</h1>
+    <button class="btn btn-primary" onclick="openModal('addWorkerModal')">+ Add Worker</button>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Phone</th>
+                    <th>Joined</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for worker in workers %}
+                <tr>
+                    <td><strong>{{ worker.name }}</strong></td>
+                    <td>{{ worker.email or '-' }}</td>
+                    <td><span class="badge badge-{{ worker.role|lower }}">{{ worker.role }}</span></td>
+                    <td>{{ worker.phone or '-' }}</td>
+                    <td class="cell-time">{{ worker.created_at[:10] if worker.created_at else '-' }}</td>
+                    <td>
+                        <a href="/workers/delete/{{ worker.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Remove this worker?')">Remove</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="cell-empty">No workers added yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Worker Modal -->
+<div id="addWorkerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add New Worker</h2>
+            <button class="modal-close" onclick="closeModal('addWorkerModal')">&times;</button>
+        </div>
+        <form action="/workers/add" method="POST">
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" name="name" required placeholder="e.g. John Smith">
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" name="email" required placeholder="e.g. john@restaurant.com">
+            </div>
+            <div class="form-group">
+                <label>Password *</label>
+                <input type="password" name="password" required placeholder="Set login password">
+            </div>
+            <div class="form-group">
+                <label>Role *</label>
+                <select name="role" required>
+                    <option value="Waiter">Waiter</option>
+                    <option value="Chef">Chef</option>
+                    <option value="Manager">Manager</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" name="phone" placeholder="555-0123">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addWorkerModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Worker</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

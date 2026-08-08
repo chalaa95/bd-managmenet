@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Pre-Products - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧪 Pre-Products & Manufacturing</h1>
+    <p class="text-muted">Create intermediate items (sauces, dough, mixes) from raw materials</p>
+    <button class="btn btn-primary" onclick="openModal('addPreProductModal')">+ Create Pre-Product</button>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Pre-Product</th>
+                    <th>Yield</th>
+                    <th>Recipe Components</th>
+                    <th>Cost / Unit</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pp in pre_products %}
+                <tr>
+                    <td>
+                        <div class="product-cell">
+                            <div class="product-icon">🧪</div>
+                            <div>
+                                <strong>{{ pp.name }}</strong>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-category">{{ "%.2f"|format(pp.yield_qty) }} {{ pp.unit }}</span></td>
+                    <td>
+                        {% if pp.recipe %}
+                            {% for comp in pp.recipe %}
+                                <div class="recipe-line">
+                                    <span class="recipe-qty">{{ "%.2f"|format(comp.quantity_needed) }} {{ comp.article_unit }}</span>
+                                    <span class="recipe-name">{{ comp.article_name }}</span>
+                                    <span class="recipe-cost">@ DT{{ "%.2f"|format(comp.avg_cost) }}</span>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">No recipe</span>
+                        {% endif %}
+                    </td>
+                    <td class="cell-price">DT{{ "%.2f"|format(pp.cost_per_unit) }} <span class="text-muted">/ {{ pp.unit }}</span></td>
+                    <td>
+                        <a href="/pre-products/delete/{{ pp.id }}" 
+                           class="btn btn-danger btn-sm"
+                           onclick="return confirm('Delete {{ pp.name }}?')">Delete</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="cell-empty">No pre-products yet. Create your first one!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Pre-Product Modal -->
+<div id="addPreProductModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Create Pre-Product</h2>
+            <button class="modal-close" onclick="closeModal('addPreProductModal')">&times;</button>
+        </div>
+        <form action="/pre-products/add" method="POST">
+            <div class="form-grid">
+                <div class="form-group form-full">
+                    <label>Pre-Product Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. Mayonnaise, Tomato Sauce, Bread Dough">
+                </div>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <select name="unit">
+                        <option value="kg">Kilograms</option>
+                        <option value="g">Grams</option>
+                        <option value="L">Liters</option>
+                        <option value="ml">Milliliters</option>
+                        <option value="pcs">Pieces</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Yield Quantity *</label>
+                    <input type="number" name="yield_qty" step="0.01" min="0.01" required placeholder="e.g. 8" value="1">
+                    <p class="form-help">How much this recipe produces (e.g. 8 kg of mayonnaise)</p>
+                </div>
+            </div>
+
+            <div class="recipe-section">
+                <h4>📋 Recipe / Raw Materials</h4>
+                <p class="recipe-help">Select articles from storage and quantities needed to produce the yield amount above.</p>
+
+                <div id="preRecipeItems">
+                    <div class="recipe-row">
+                        <div class="form-group flex-2">
+                            <label>Article</label>
+                            <select name="recipe_article_id[]">
+                                <option value="">-- Select article --</option>
+                                {% for article in articles %}
+                                <option value="{{ article.id }}">{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addPreRecipeRow()">+ Add Component</button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addPreProductModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Pre-Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function addPreRecipeRow() {
+    const container = document.getElementById('preRecipeItems');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.innerHTML = `
+        <div class="form-group flex-2">
+            <label>Article</label>
+            <select name="recipe_article_id[]">
+                <option value="">-- Select article --</option>
+                {% for article in articles %}
+                <option value="{{ article.id }}">{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity</label>
+            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+    `;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

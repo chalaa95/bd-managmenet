@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Storage - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🏪 Storage & Articles</h1>
+    <p class="text-muted">Raw materials and ingredients inventory</p>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>Location</th>
+                    <th>Stock</th>
+                    <th>Min Level</th>
+                    <th>Unit Cost</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td><strong>{{ item.name }}</strong></td>
+                    <td>{{ item.location }}</td>
+                    <td>
+                        <div class="stock-bar">
+                            {% set pct = (item.stock_qty / (item.min_stock * 3) * 100) if item.min_stock > 0 else 100 %}
+                            {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+                            <div class="stock-fill {% if item.stock_qty <= item.min_stock %}stock-low{% elif item.stock_qty <= item.min_stock * 2 %}stock-medium{% else %}stock-good{% endif %}" 
+                                 style="width: {{ pct }}%"></div>
+                            <span>{{ "%.2f"|format(item.stock_qty) }} {{ item.unit }}</span>
+                        </div>
+                    </td>
+                    <td>{{ "%.2f"|format(item.min_stock) }} {{ item.unit }}</td>
+                    <td class="cell-price">DT{{ "%.2f"|format(item.avg_cost) }}</td>
+                    <td>
+                        {% if item.stock_qty <= item.min_stock %}
+                            <span class="badge badge-danger">Critical</span>
+                        {% elif item.stock_qty <= item.min_stock * 2 %}
+                            <span class="badge badge-warning">Low</span>
+                        {% else %}
+                            <span class="badge badge-success">Good</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn btn-sm" onclick="openEditModal({{ item.id }}, '{{ item.name }}', {{ item.stock_qty }}, {{ item.min_stock }}, '{{ item.location }}', '{{ item.unit }}', {{ item.avg_cost }})">Edit</button>
+                            <a href="/storage/delete/{{ item.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Delete {{ item.name }}? This will remove all stock permanently.')">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="cell-empty">No articles in storage. Add via Purchases!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Update Article</h2>
+            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+        </div>
+        <form id="editForm" method="POST">
+            <div class="form-grid">
+                <div class="form-group form-full">
+                    <label>Name</label>
+                    <input type="text" name="name" id="editName" required>
+                </div>
+                <div class="form-group">
+                    <label>Current Stock</label>
+                    <input type="number" name="quantity" id="editQty" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Min Stock Alert</label>
+                    <input type="number" name="min_stock" id="editMin" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <select name="unit" id="editUnit">
+                        <option value="pcs">Pieces</option>
+                        <option value="kg">Kilograms</option>
+                        <option value="g">Grams</option>
+                        <option value="L">Liters</option>
+                        <option value="ml">Milliliters</option>
+                        <option value="bottles">Bottles</option>
+                        <option value="cans">Cans</option>
+                        <option value="boxes">Boxes</option>
+                        <option value="packs">Packs</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <select name="location" id="editLoc">
+                        <option value="Kitchen">Kitchen</option>
+                        <option value="Fridge">Fridge</option>
+                        <option value="Freezer">Freezer</option>
+                        <option value="Storage Room">Storage Room</option>
+                        <option value="Bar">Bar</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Avg Cost ($)</label>
+                    <input type="number" id="editCost" step="0.01" min="0" readonly style="background:#f1f5f9;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, name, qty, min, loc, unit, cost) {
+    document.getElementById('editForm').action = '/storage/update/' + id;
+    document.getElementById('editName').value = name;
+    document.getElementById('editQty').value = qty;
+    document.getElementById('editMin').value = min;
+    document.getElementById('editLoc').value = loc;
+    document.getElementById('editUnit').value = unit;
+    document.getElementById('editCost').value = cost;
+    openModal('editModal');
+}
+</script>
+{% endblock %}

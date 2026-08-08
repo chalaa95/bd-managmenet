@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Products - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📦 Products & Recipes</h1>
+    <button class="btn btn-primary" onclick="openModal('addProductModal')">+ Add Product</button>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Sell Price</th>
+                    <th>Recipe Cost</th>
+                    <th>Margin</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>
+                        <div class="product-cell">
+                            <div class="product-icon">🍽️</div>
+                            <div>
+                                <strong>{{ product.name }}</strong>
+                                {% if not product.is_active %}<span class="badge badge-inactive">Inactive</span>{% endif %}
+                                <p class="product-desc">{{ product.description or 'No description' }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-category">{{ product.category }}</span></td>
+                    <td class="cell-price">DT{{ "%.2f"|format(product.price) }}</td>
+                    <td class="cell-price">DT{{ "%.2f"|format(product.cost) }}</td>
+                    <td>
+                        <span class="margin-badge {% if product.margin > 50 %}margin-good{% elif product.margin > 20 %}margin-ok{% else %}margin-low{% endif %}">
+                            {{ "%.1f"|format(product.margin) }}%
+                        </span>
+                    </td>
+                    <td>
+                        <a href="/products/delete/{{ product.id }}" 
+                           class="btn btn-danger btn-sm"
+                           onclick="return confirm('Delete this product?')">Delete</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="cell-empty">No products yet. Add your first product!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div id="addProductModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Add New Product</h2>
+            <button class="modal-close" onclick="closeModal('addProductModal')">&times;</button>
+        </div>
+        <form action="/products/add" method="POST">
+            <div class="form-grid">
+                <div class="form-group form-full">
+                    <label>Product Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. Margherita Pizza">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category">
+                        <option value="Food">Food</option>
+                        <option value="Drinks">Drinks</option>
+                        <option value="Desserts">Desserts</option>
+                        <option value="Sides">Sides</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Selling Price *</label>
+                    <input type="number" name="price" step="0.01" min="0" required placeholder="0.00">
+                </div>
+                <div class="form-group form-full">
+                    <label>Description</label>
+                    <textarea name="description" rows="2" placeholder="Brief description..."></textarea>
+                </div>
+            </div>
+
+            <!-- Recipe / BOM Section -->
+            <div class="recipe-section">
+                <h4>🧪 Recipe / Components</h4>
+                <p class="recipe-help">Select articles from storage OR pre-products (like sauces, dough) and how much goes into one unit of this product. Cost is calculated automatically.</p>
+
+                <h5 class="recipe-subtitle">📦 Raw Materials (Articles)</h5>
+                <div id="recipeItems">
+                    <div class="recipe-row">
+                        <div class="form-group flex-2">
+                            <label>Article</label>
+                            <select name="recipe_article_id[]">
+                                <option value="">-- Select article --</option>
+                                {% for article in articles %}
+                                <option value="{{ article.id }}">{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addRecipeRow()">+ Add Article</button>
+
+                <h5 class="recipe-subtitle mt-3">🧪 Pre-Products (Sauces, Mixes, etc.)</h5>
+                <div id="preProductItems">
+                    <div class="recipe-row">
+                        <div class="form-group flex-2">
+                            <label>Pre-Product</label>
+                            <select name="recipe_pre_product_id[]">
+                                <option value="">-- Select pre-product --</option>
+                                {% for pp in pre_products %}
+                                <option value="{{ pp.id }}">{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addPreProductRow()">+ Add Pre-Product</button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addProductModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function addRecipeRow() {
+    const container = document.getElementById('recipeItems');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.innerHTML = `
+        <div class="form-group flex-2">
+            <label>Article</label>
+            <select name="recipe_article_id[]">
+                <option value="">-- Select article --</option>
+                {% for article in articles %}
+                <option value="{{ article.id }}">{{ article.name }} ($DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity Needed</label>
+            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+    `;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Restaurant Manager{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="dash-header">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="dash-date">📅 {{ current_date }}</p>
+    </div>
+    <div class="dash-actions">
+        <a href="/sales" class="btn btn-primary">+ New Sale</a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-bg-icon">💰</div>
+        <div class="stat-body">
+            <p class="stat-label">Today's Revenue</p>
+            <h2 class="stat-value">DT{{ "%.2f"|format(today_revenue) }}</h2>
+            <span class="stat-sub">{{ today_orders }} orders today</span>
+        </div>
+        <div class="stat-bar" style="background: #dbeafe;"></div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-bg-icon">📦</div>
+        <div class="stat-body">
+            <p class="stat-label">Products</p>
+            <h2 class="stat-value">{{ total_products }}</h2>
+            {% if low_stock > 0 %}
+                <span class="stat-sub stat-alert">⚠️ {{ low_stock }} low stock</span>
+            {% else %}
+                <span class="stat-sub stat-ok">✅ All stock OK</span>
+            {% endif %}
+        </div>
+        <div class="stat-bar" style="background: #dcfce7;"></div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-bg-icon">👥</div>
+        <div class="stat-body">
+            <p class="stat-label">Team Members</p>
+            <h2 class="stat-value">{{ total_workers }}</h2>
+            <span class="stat-sub">Active staff</span>
+        </div>
+        <div class="stat-bar" style="background: #f3e8ff;"></div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-bg-icon">📈</div>
+        <div class="stat-body">
+            <p class="stat-label">Avg Order</p>
+            <h2 class="stat-value">DT{{ "%.2f"|format(today_revenue / today_orders if today_orders > 0 else 0) }}</h2>
+            <span class="stat-sub">Per transaction</span>
+        </div>
+        <div class="stat-bar" style="background: #fef3c7;"></div>
+    </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="dash-row">
+    <!-- Chart Section -->
+    <div class="dash-panel chart-panel">
+        <div class="panel-header">
+            <h3>📊 Revenue Trend</h3>
+            <span class="panel-badge">Last 7 Days</span>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    <div class="dash-panel alerts-panel">
+        <div class="panel-header">
+            <h3>⚠️ Stock Alerts</h3>
+            <span class="panel-badge badge-warn">{{ low_stock_items|length }} items</span>
+        </div>
+        <div class="alerts-list">
+            {% if low_stock_items %}
+                {% for item in low_stock_items %}
+                <div class="alert-box">
+                    <div class="alert-icon">🔴</div>
+                    <div class="alert-details">
+                        <strong>{{ item.product_name }}</strong>
+                        <span>{{ item.location }} • {{ item.quantity }} / {{ item.min_stock }} {{ item.unit }}</span>
+                    </div>
+                    <a href="/storage" class="alert-link">Restock →</a>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert-empty">
+                    <div class="alert-empty-icon">✅</div>
+                    <p>All inventory levels are healthy!</p>
+                    <span>No restocking needed</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sales Table -->
+<div class="dash-panel">
+    <div class="panel-header">
+        <h3>🕐 Recent Sales</h3>
+        <a href="/sales" class="panel-link">View All →</a>
+    </div>
+    <div class="table-responsive">
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Table</th>
+                    <th>Items</th>
+                    <th class="text-right">Total</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in recent_sales %}
+                <tr>
+                    <td><span class="order-id">{{ sale.order_number }}</span></td>
+                    <td><span class="table-badge">🪑 {{ sale.table_number or 'N/A' }}</span></td>
+                    <td class="cell-items" title="{{ sale.items or '' }}">{{ sale.items or '-' }}</td>
+                    <td class="text-right price">DT{{ "%.2f"|format(sale.total_amount) }}</td>
+                    <td><span class="status-pill status-{{ sale.status|lower }}">{{ sale.status }}</span></td>
+                    <td class="time">{{ sale.created_at[:16] if sale.created_at else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="empty-row">
+                        <div class="empty-state">
+                            <span>🛒</span>
+                            <p>No sales yet today</p>
+                            <a href="/sales" class="btn btn-primary btn-sm">Create First Sale</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('salesChart').getContext('2d');
+const chartData = {{ chart_data|tojson }};
+
+const labels = chartData.map(d => {
+    const date = new Date(d.date + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+});
+const data = chartData.map(d => parseFloat(d.total) || 0);
+
+// Fill missing days
+if (labels.length < 7) {
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+        const dateStr = d.toISOString().split('T')[0];
+        const exists = chartData.find(c => c.date === dateStr);
+        if (!exists) {
+            labels.push(label);
+            data.push(0);
+        }
+    }
+}
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Revenue (DT)',
+            data: data,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointBackgroundColor: '#2563eb',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#1e293b',
+                padding: 12,
+                cornerRadius: 8,
+                callbacks: {
+                    label: function(context) {
+                        return 'DT' + context.parsed.y.toFixed(2);
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { font: { size: 12 }, color: '#64748b' }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: '#f1f5f9' },
+                ticks: {
+                    font: { size: 12 },
+                    color: '#64748b',
+                    callback: function(value) { return 'DT' + value; }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

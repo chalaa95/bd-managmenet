@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Restaurant Manager{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    {% if current_user %}
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🍽️</span>
+                <span class="logo-text">RestoManager</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/sales" class="nav-item {% if request.path == '/sales' %}active{% endif %}">
+                    <span class="nav-icon">🛒</span>
+                    <span>Sales / POS</span>
+                </a>
+                {% if current_user.role in ['Manager', 'Chef'] %}
+                <a href="/products" class="nav-item {% if request.path == '/products' %}active{% endif %}">
+                    <span class="nav-icon">🍕</span>
+                    <span>Products</span>
+                </a>
+                <a href="/storage" class="nav-item {% if request.path == '/storage' %}active{% endif %}">
+                    <span class="nav-icon">📦</span>
+                    <span>Storage</span>
+                </a>
+                <a href="/pre-products" class="nav-item {% if request.path == '/pre-products' %}active{% endif %}">
+                    <span class="nav-icon">🥣</span>
+                    <span>Pre-Products</span>
+                </a>
+                <a href="/purchases" class="nav-item {% if request.path == '/purchases' %}active{% endif %}">
+                    <span class="nav-icon">🚚</span>
+                    <span>Purchases</span>
+                </a>
+                {% endif %}
+                {% if current_user.role == 'Manager' %}
+                <a href="/workers" class="nav-item {% if request.path == '/workers' %}active{% endif %}">
+                    <span class="nav-icon">👥</span>
+                    <span>Workers</span>
+                </a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">{{ current_user.name[0] }}</div>
+                    <div class="user-info">
+                        <span class="user-name">{{ current_user.name }}</span>
+                        <span class="user-role">{{ current_user.role }}</span>
+                    </div>
+                </div>
+                <a href="/logout" class="logout-link">🚪 Logout</a>
+                <p>© Data saved locally</p>
+            </div>
+        </aside>
+    {% endif %}
+
+        <main class="main-content {% if not current_user %}login-page{% endif %}">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="flash flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+    {% if current_user %}
+    </div>
+    {% endif %}
+
+    <script>
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        setTimeout(() => {
+            document.querySelectorAll('.flash').forEach(el => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 300);
+            });
+        }, 4000);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
