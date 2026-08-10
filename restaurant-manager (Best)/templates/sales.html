@@ -8,10 +8,10 @@
 <div class="pos-layout">
     <div class="pos-products">
         <div class="category-tabs">
-            <button class="tab-btn active" onclick="filter('all')">All</button>
-            <button class="tab-btn" onclick="filter('Food')">Food</button>
-            <button class="tab-btn" onclick="filter('Drinks')">Drinks</button>
-            <button class="tab-btn" onclick="filter('Desserts')">Desserts</button>
+            <button class="tab-btn active" onclick="filter('all', this)">All</button>
+            {% for cat in categories %}
+            <button class="tab-btn" onclick="filter('{{ cat.name }}', this)">{{ cat.name }}</button>
+            {% endfor %}
         </div>
         <div class="product-grid" id="productGrid">
             {% for product in products %}
@@ -66,7 +66,7 @@
 </div>
 
 <div class="card mt-4">
-    <div class="card-header"><h2>🕐 Today's Sales</h2></div>
+    <div class="card-header"><h2>📋 Today's Sales</h2></div>
     <div class="table-responsive">
         <table class="data-table">
             <thead><tr><th>Order #</th><th>Table</th><th>Total</th><th>Discount</th><th>Payment</th><th>Cashier</th><th>Actions</th></tr></thead>
@@ -183,9 +183,9 @@ function updateTotals() {
     }
 }
 
-function filter(category) {
+function filter(category, btnEl) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    btnEl.classList.add('active');
     document.querySelectorAll('.product-card').forEach(card => {
         card.style.display = (category === 'all' || card.dataset.category === category) ? 'block' : 'none';
     });

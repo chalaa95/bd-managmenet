@@ -3,14 +3,131 @@
 {% block title %}Products - Restaurant Manager{% endblock %}
 
 {% block content %}
+<style>
+.page-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Category Filter Tabs */
+.cat-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding: 0 4px;
+}
+.cat-tab {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.cat-tab:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+.cat-tab.active {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #3b82f6;
+}
+
+/* Hide rows not matching filter */
+.product-row.hidden-cat {
+    display: none !important;
+}
+
+.cat-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.cat-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 14px;
+    color: #334155;
+}
+.cat-list li:last-child {
+    border-bottom: none;
+}
+.cat-list li:hover {
+    background: #f8fafc;
+}
+.cat-list .cat-name {
+    font-weight: 500;
+}
+.cat-list .btn-delete-cat {
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+}
+.cat-list .btn-delete-cat:hover {
+    background: #fecaca;
+}
+.cat-empty {
+    text-align: center;
+    color: #94a3b8;
+    padding: 20px;
+    font-size: 13px;
+}
+
+/* Action buttons */
+.action-btns {
+    display: flex;
+    gap: 6px;
+}
+.btn-edit {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+}
+.btn-edit:hover {
+    background: #bfdbfe;
+}
+</style>
+
 <div class="page-header">
     <h1>📦 Products & Recipes</h1>
-    <button class="btn btn-primary" onclick="openModal('addProductModal')">+ Add Product</button>
+    <div class="page-header-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openModal('manageCategoriesModal')">⚙️ Categories</button>
+        <button class="btn btn-primary" onclick="openModal('addProductModal')">+ Add Product</button>
+    </div>
+</div>
+
+<!-- Category Filter Tabs -->
+<div class="cat-tabs">
+    <div class="cat-tab active" onclick="filterProducts('all', this)">All</div>
+    {% for cat in categories %}
+    <div class="cat-tab" onclick="filterProducts('{{ cat.name }}', this)">{{ cat.name }}</div>
+    {% endfor %}
 </div>
 
 <div class="card">
     <div class="table-responsive">
-        <table class="data-table">
+        <table class="data-table" id="productsTable">
             <thead>
                 <tr>
                     <th>Product</th>
@@ -23,7 +140,7 @@
             </thead>
             <tbody>
                 {% for product in products %}
-                <tr>
+                <tr class="product-row" data-category="{{ product.category }}">
                     <td>
                         <div class="product-cell">
                             <div class="product-icon">🍽️</div>
@@ -43,9 +160,12 @@
                         </span>
                     </td>
                     <td>
-                        <a href="/products/delete/{{ product.id }}" 
-                           class="btn btn-danger btn-sm"
-                           onclick="return confirm('Delete this product?')">Delete</a>
+                        <div class="action-btns">
+                            <button class="btn-edit" onclick="openEditModal({{ product.id }})">Edit</button>
+                            <a href="/products/delete/{{ product.id }}" 
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('Delete this product?')">Delete</a>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -55,6 +175,40 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div id="manageCategoriesModal" class="modal">
+    <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-header">
+            <h2>⚙️ Manage Categories</h2>
+            <button class="modal-close" onclick="closeModal('manageCategoriesModal')">&times;</button>
+        </div>
+        <form action="/categories/add" method="POST" style="margin-bottom: 16px;">
+            <div style="display: flex; gap: 8px;">
+                <input type="text" name="name" placeholder="New category name..." required 
+                       style="flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                <button type="submit" class="btn btn-primary btn-sm">Add</button>
+            </div>
+        </form>
+        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <ul class="cat-list">
+                {% for cat in categories %}
+                <li>
+                    <span class="cat-name">{{ cat.name }}</span>
+                    <a href="/categories/delete/{{ cat.id }}" 
+                       class="btn-delete-cat"
+                       onclick="return confirm('Delete category &quot;{{ cat.name }}&quot;?')">Delete</a>
+                </li>
+                {% else %}
+                <li class="cat-empty">No categories yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="modal-footer" style="margin-top: 16px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('manageCategoriesModal')">Close</button>
+        </div>
     </div>
 </div>
 
@@ -74,11 +228,11 @@
                 <div class="form-group">
                     <label>Category</label>
                     <select name="category">
+                        {% for cat in categories %}
+                        <option value="{{ cat.name }}">{{ cat.name }}</option>
+                        {% else %}
                         <option value="Food">Food</option>
-                        <option value="Drinks">Drinks</option>
-                        <option value="Desserts">Desserts</option>
-                        <option value="Sides">Sides</option>
-                        <option value="Other">Other</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
@@ -93,10 +247,10 @@
 
             <!-- Recipe / BOM Section -->
             <div class="recipe-section">
-                <h4>🧪 Recipe / Components</h4>
+                <h4>🍳 Recipe / Components</h4>
                 <p class="recipe-help">Select articles from storage OR pre-products (like sauces, dough) and how much goes into one unit of this product. Cost is calculated automatically.</p>
 
-                <h5 class="recipe-subtitle">📦 Raw Materials (Articles)</h5>
+                <h5 class="recipe-subtitle">🥩 Raw Materials (Articles)</h5>
                 <div id="recipeItems">
                     <div class="recipe-row">
                         <div class="form-group flex-2">
@@ -116,7 +270,7 @@
                 </div>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="addRecipeRow()">+ Add Article</button>
 
-                <h5 class="recipe-subtitle mt-3">🧪 Pre-Products (Sauces, Mixes, etc.)</h5>
+                <h5 class="recipe-subtitle mt-3">🥣 Pre-Products (Sauces, Mixes, etc.)</h5>
                 <div id="preProductItems">
                     <div class="recipe-row">
                         <div class="form-group flex-2">
@@ -145,7 +299,224 @@
     </div>
 </div>
 
+<!-- Edit Product Modal -->
+<div id="editProductModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Edit Product</h2>
+            <button class="modal-close" onclick="closeModal('editProductModal')">&times;</button>
+        </div>
+        <form id="editProductForm" action="" method="POST">
+            <div class="form-grid">
+                <div class="form-group form-full">
+                    <label>Product Name *</label>
+                    <input type="text" name="name" id="edit_name" required placeholder="e.g. Margherita Pizza">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category" id="edit_category">
+                        {% for cat in categories %}
+                        <option value="{{ cat.name }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Selling Price *</label>
+                    <input type="number" name="price" id="edit_price" step="0.01" min="0" required placeholder="0.00">
+                </div>
+                <div class="form-group form-full">
+                    <label>Description</label>
+                    <textarea name="description" id="edit_description" rows="2" placeholder="Brief description..."></textarea>
+                </div>
+            </div>
+
+            <!-- Recipe / BOM Section -->
+            <div class="recipe-section">
+                <h4>🍳 Recipe / Components</h4>
+                <p class="recipe-help">Select articles from storage OR pre-products (like sauces, dough) and how much goes into one unit of this product. Cost is calculated automatically.</p>
+
+                <h5 class="recipe-subtitle">🥩 Raw Materials (Articles)</h5>
+                <div id="editRecipeItems">
+                    <div class="recipe-row">
+                        <div class="form-group flex-2">
+                            <label>Article</label>
+                            <select name="recipe_article_id[]">
+                                <option value="">-- Select article --</option>
+                                {% for article in articles %}
+                                <option value="{{ article.id }}">{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addEditRecipeRow()">+ Add Article</button>
+
+                <h5 class="recipe-subtitle mt-3">🥣 Pre-Products (Sauces, Mixes, etc.)</h5>
+                <div id="editPreProductItems">
+                    <div class="recipe-row">
+                        <div class="form-group flex-2">
+                            <label>Pre-Product</label>
+                            <select name="recipe_pre_product_id[]">
+                                <option value="">-- Select pre-product --</option>
+                                {% for pp in pre_products %}
+                                <option value="{{ pp.id }}">{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity</label>
+                            <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addEditPreProductRow()">+ Add Pre-Product</button>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editProductModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+// ===== Category Filter =====
+function filterProducts(category, tabEl) {
+    // Update active tab
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+    tabEl.classList.add('active');
+
+    // Filter rows
+    const rows = document.querySelectorAll('.product-row');
+    rows.forEach(row => {
+        if (category === 'all' || row.dataset.category === category) {
+            row.classList.remove('hidden-cat');
+        } else {
+            row.classList.add('hidden-cat');
+        }
+    });
+}
+
+// ===== Edit Modal =====
+const productData = {
+    {% for product in products %}
+    {{ product.id }}: {
+        name: {{ product.name|tojson }},
+        description: {{ (product.description or '')|tojson }},
+        price: {{ product.price }},
+        category: {{ product.category|tojson }},
+        recipe: {{ product_recipes_map.get(product.id, [])|tojson }},
+        preProducts: {{ product_pre_map.get(product.id, [])|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+function openEditModal(productId) {
+    const p = productData[productId];
+    if (!p) return;
+
+    document.getElementById('editProductForm').action = '/products/edit/' + productId;
+    document.getElementById('edit_name').value = p.name;
+    document.getElementById('edit_description').value = p.description;
+    document.getElementById('edit_price').value = p.price;
+    document.getElementById('edit_category').value = p.category;
+
+    // Build recipe rows
+    const recipeContainer = document.getElementById('editRecipeItems');
+    recipeContainer.innerHTML = '';
+    if (p.recipe && p.recipe.length > 0) {
+        p.recipe.forEach(r => {
+            recipeContainer.innerHTML += `
+                <div class="recipe-row">
+                    <div class="form-group flex-2">
+                        <label>Article</label>
+                        <select name="recipe_article_id[]">
+                            <option value="">-- Select article --</option>
+                            {% for article in articles %}
+                            <option value="{{ article.id }}" ${r.article_id == {{ article.id }} ? 'selected' : ''}>{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" name="recipe_qty[]" step="0.01" min="0" value="${r.quantity_needed}" placeholder="0.00">
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+                </div>
+            `;
+        });
+    } else {
+        recipeContainer.innerHTML = `
+            <div class="recipe-row">
+                <div class="form-group flex-2">
+                    <label>Article</label>
+                    <select name="recipe_article_id[]">
+                        <option value="">-- Select article --</option>
+                        {% for article in articles %}
+                        <option value="{{ article.id }}">{{ article.name }} (DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+                </div>
+            </div>
+        `;
+    }
+
+    // Build pre-product rows
+    const preContainer = document.getElementById('editPreProductItems');
+    preContainer.innerHTML = '';
+    if (p.preProducts && p.preProducts.length > 0) {
+        p.preProducts.forEach(r => {
+            preContainer.innerHTML += `
+                <div class="recipe-row">
+                    <div class="form-group flex-2">
+                        <label>Pre-Product</label>
+                        <select name="recipe_pre_product_id[]">
+                            <option value="">-- Select pre-product --</option>
+                            {% for pp in pre_products %}
+                            <option value="{{ pp.id }}" ${r.pre_product_id == {{ pp.id }} ? 'selected' : ''}>{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" value="${r.quantity_needed}" placeholder="0.00">
+                    </div>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+                </div>
+            `;
+        });
+    } else {
+        preContainer.innerHTML = `
+            <div class="recipe-row">
+                <div class="form-group flex-2">
+                    <label>Pre-Product</label>
+                    <select name="recipe_pre_product_id[]">
+                        <option value="">-- Select pre-product --</option>
+                        {% for pp in pre_products %}
+                        <option value="{{ pp.id }}">{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" placeholder="0.00">
+                </div>
+            </div>
+        `;
+    }
+
+    openModal('editProductModal');
+}
+
 function addRecipeRow() {
     const container = document.getElementById('recipeItems');
     const row = document.createElement('div');
@@ -163,6 +534,75 @@ function addRecipeRow() {
         <div class="form-group">
             <label>Quantity Needed</label>
             <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+    `;
+    container.appendChild(row);
+}
+
+function addPreProductRow() {
+    const container = document.getElementById('preProductItems');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.innerHTML = `
+        <div class="form-group flex-2">
+            <label>Pre-Product</label>
+            <select name="recipe_pre_product_id[]">
+                <option value="">-- Select pre-product --</option>
+                {% for pp in pre_products %}
+                <option value="{{ pp.id }}">{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity Needed</label>
+            <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+    `;
+    container.appendChild(row);
+}
+
+function addEditRecipeRow() {
+    const container = document.getElementById('editRecipeItems');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.innerHTML = `
+        <div class="form-group flex-2">
+            <label>Article</label>
+            <select name="recipe_article_id[]">
+                <option value="">-- Select article --</option>
+                {% for article in articles %}
+                <option value="{{ article.id }}">{{ article.name }} ($DT{{ "%.2f"|format(article.avg_cost) }} / {{ article.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity Needed</label>
+            <input type="number" name="recipe_qty[]" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
+    `;
+    container.appendChild(row);
+}
+
+function addEditPreProductRow() {
+    const container = document.getElementById('editPreProductItems');
+    const row = document.createElement('div');
+    row.className = 'recipe-row';
+    row.innerHTML = `
+        <div class="form-group flex-2">
+            <label>Pre-Product</label>
+            <select name="recipe_pre_product_id[]">
+                <option value="">-- Select pre-product --</option>
+                {% for pp in pre_products %}
+                <option value="{{ pp.id }}">{{ pp.name }} (DT{{ "%.2f"|format(pp.cost_per_unit) }} / {{ pp.unit }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Quantity Needed</label>
+            <input type="number" name="recipe_pre_qty[]" step="0.01" min="0" placeholder="0.00">
         </div>
         <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()" style="margin-bottom:8px;">×</button>
     `;

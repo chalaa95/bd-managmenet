@@ -115,7 +115,7 @@
                 <tr>
                     <th>Order #</th>
                     <th>Table</th>
-                    <th>Items</th>
+                   <th>Items</th>
                     <th class="text-right">Total</th>
                     <th>Status</th>
                     <th>Time</th>
@@ -127,7 +127,7 @@
                     <td><span class="order-id">{{ sale.order_number }}</span></td>
                     <td><span class="table-badge">🪑 {{ sale.table_number or 'N/A' }}</span></td>
                     <td class="cell-items" title="{{ sale.items or '' }}">{{ sale.items or '-' }}</td>
-                    <td class="text-right price">DT{{ "%.2f"|format(sale.total_amount) }}</td>
+                    <td class="text-right price">DTT{{ "%.2f"|format(sale.total_amount) }}</td>
                     <td><span class="status-pill status-{{ sale.status|lower }}">{{ sale.status }}</span></td>
                     <td class="time">{{ sale.created_at[:16] if sale.created_at else '-' }}</td>
                 </tr>
@@ -158,10 +158,10 @@ const labels = chartData.map(d => {
     const date = new Date(d.date + 'T00:00:00');
     return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 });
-const data = chartData.map(d => parseFloat(d.total) || 0);
+consst data = chartData.map(d => parseFloat(d.total) || 0);
 
 // Fill missing days
-if (labels.length < 7) {
+if (labels.lngth < 7) {
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);

@@ -3,6 +3,75 @@
 {% block title %}Purchases - Restaurant Manager{% endblock %}
 
 {% block content %}
+<style>
+.order-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.order-row:hover {
+    background: #f1f5f9 !important;
+}
+.order-row td:first-child {
+    width: 40px;
+    text-align: center;
+    vertical-align: middle;
+}
+.chevron {
+    display: inline-block;
+    font-size: 12px;
+    color: #64748b;
+    transition: transform 0.2s ease;
+    user-select: none;
+}
+.detail-row {
+    background: #f8fafc;
+}
+.detail-row > td {
+    padding: 0 !important;
+    border-bottom: 1px solid #e2e8f0;
+}
+.order-detail-panel {
+    padding: 16px 24px 20px 56px;
+}
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 24px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #475569;
+}
+.detail-grid strong {
+    color: #1e293b;
+}
+.detail-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+}
+.detail-items-table th {
+    text-align: left;
+    padding: 8px 10px;
+    background: #e2e8f0;
+    color: #334155;
+    font-weight: 600;
+    border-radius: 6px 6px 0 0;
+}
+.detail-items-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+}
+.detail-items-table tr:last-child td {
+    border-bottom: none;
+}
+.detail-items-table .cell-price {
+    font-weight: 600;
+    color: #0f172a;
+}
+</style>
+
 <div class="page-header">
     <h1>🚚 Purchases & Suppliers</h1>
     <button class="btn btn-primary" onclick="openModal('addPurchaseModal')">+ New Purchase Order</button>
@@ -13,9 +82,9 @@
         <table class="data-table">
             <thead>
                 <tr>
+                    <th style="width:40px;"></th>
                     <th>Order #</th>
                     <th>Supplier</th>
-                    <th>Items</th>
                     <th>Total</th>
                     <th>Status</th>
                     <th>Ordered By</th>
@@ -25,20 +94,62 @@
             </thead>
             <tbody>
                 {% for purchase in purchases %}
-                <tr>
+                <tr class="order-row" onclick="toggleDetails({{ purchase.id }})" id="row-{{ purchase.id }}">
+                    <td><span class="chevron" id="chev-{{ purchase.id }}">▶</span></td>
                     <td><strong>#{{ purchase.id }}</strong></td>
                     <td>{{ purchase.supplier }}</td>
-                    <td class="cell-truncate" title="{{ purchase.items or '' }}">{{ purchase.items or '-' }}</td>
                     <td class="cell-price">DT{{ "%.2f"|format(purchase.total_amount) }}</td>
                     <td>
                         <span class="badge badge-{{ purchase.status|lower }}">{{ purchase.status }}</span>
                     </td>
                     <td>{{ purchase.ordered_by or '-' }}</td>
                     <td class="cell-time">{{ purchase.order_date[:16] if purchase.order_date else '-' }}</td>
-                    <td>
+                    <td onclick="event.stopPropagation()">
                         {% if purchase.status == 'Ordered' %}
                         <a href="/purchases/receive/{{ purchase.id }}" class="btn btn-success btn-sm">Receive</a>
                         {% endif %}
+                    </td>
+                </tr>
+                <tr class="detail-row" id="detail-{{ purchase.id }}" style="display:none;">
+                    <td colspan="8">
+                        <div class="order-detail-panel">
+                            <div class="detail-grid">
+                                <div><strong>Invoice:</strong> {{ purchase.invoice_number or '-' }}</div>
+                                <div><strong>Supplier:</strong> {{ purchase.supplier }}</div>
+                                <div><strong>Total:</strong> DT{{ "%.2f"|format(purchase.total_amount) }}</div>
+                                <div><strong>Status:</strong> {{ purchase.status }}</div>
+                                <div><strong>Ordered By:</strong> {{ purchase.ordered_by or '-' }}</div>
+                                <div><strong>Date:</strong> {{ purchase.order_date[:16] if purchase.order_date else '-' }}</div>
+                            </div>
+                            <h5 style="margin:0 0 6px 0;font-size:14px;color:#1e293b;">📦 Order Items</h5>
+                            <table class="detail-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Article</th>
+                                        <th style="text-align:center;">Qty</th>
+                                        <th style="text-align:center;">Unit</th>
+                                        <th style="text-align:right;">Unit Price</th>
+                                        <th style="text-align:right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% set items = purchase_items_map.get(purchase.id, []) %}
+                                    {% for item in items %}
+                                    <tr>
+                                        <td>{{ item.item_name }}</td>
+                                        <td style="text-align:center;">{{ "%.2f"|format(item.quantity) if item.quantity == item.quantity|int else item.quantity }}</td>
+                                        <td style="text-align:center;">{{ item.unit }}</td>
+                                        <td style="text-align:right;">DT{{ "%.2f"|format(item.unit_price) }}</td>
+                                        <td style="text-align:right;" class="cell-price">DT{{ "%.2f"|format(item.total) }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="cell-empty" style="text-align:center;padding:12px;">No items in this order</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -76,12 +187,12 @@
                         <option value="{{ worker.name }}">{{ worker.name }}</option>
                         {% endfor %}
                     </select>
-                </div>
+               </div>
             </div>
 
             <h4 class="mt-4 mb-2">Items Bought</h4>
             <div id="purchaseItems">
-                <div class="purchase-item-card">
+                 <div class="purchase-item-card">
                     <div class="purchase-item-header">
                         <span class="item-num">Item 1</span>
                         <button type="button" class="btn-remove-item" onclick="this.closest('.purchase-item-card').remove(); renumberItems();">×</button>
@@ -100,6 +211,7 @@
                         <div class="form-group">
                             <label>Purchase Unit *</label>
                             <select name="unit[]" class="purchase-unit" onchange="updateUnitDisplay(this)">
+                                <option value="pcs" selected>pcs</option>
                                 <option value="tray">tray</option>
                                 <option value="box">box</option>
                                 <option value="case">case</option>
@@ -109,7 +221,6 @@
                                 <option value="pack">pack</option>
                                 <option value="kg">kg</option>
                                 <option value="L">L</option>
-                                <option value="pcs">pcs</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -117,6 +228,9 @@
                             <input type="number" name="price[]" step="0.01" min="0" placeholder="7.00" required>
                         </div>
                     </div>
+
+                    <!-- Hidden flag to track if conversion is active -->
+                    <input type="hidden" name="conv_active[]" class="conv-active-flag" value="0">
 
                     <!-- Conversion Toggle -->
                     <div class="conversion-toggle-row">
@@ -133,10 +247,16 @@
                         <div class="conversion-inputs">
                             <span class="conv-equals">1</span>
                             <select class="conv-from-unit" onchange="syncPurchaseUnit(this)">
-                                <option value="tray">tray</option>
-                                <option value="can">can</option>
-                                <option value="bag">bag</option>
                                 <option value="pcs">pcs</option>
+                                <option value="tray">tray</option>
+                                <option value="box">box</option>
+                                <option value="case">case</option>
+                                <option value="can">can</option>
+                                <option value="bottle">bottle</option>
+                                <option value="bag">bag</option>
+                                <option value="pack">pack</option>
+                                <option value="kg">kg</option>
+                                <option value="L">L</option>
                             </select>
                             <span class="conv-equals">=</span>
                             <input type="number" name="conv_factor[]" step="0.01" min="0.01" value="1" placeholder="Qty" class="conv-factor">
@@ -164,6 +284,18 @@
 <script>
 let itemCounter = 1;
 
+function toggleDetails(id) {
+    const row = document.getElementById('detail-' + id);
+    const chev = document.getElementById('chev-' + id);
+    if (row.style.display === 'none') {
+        row.style.display = 'table-row';
+        chev.style.transform = 'rotate(90deg)';
+    } else {
+        row.style.display = 'none';
+        chev.style.transform = 'rotate(0deg)';
+    }
+}
+
 function addPurchaseItem() {
     itemCounter++;
     const container = document.getElementById('purchaseItems');
@@ -188,6 +320,7 @@ function addPurchaseItem() {
             <div class="form-group">
                 <label>Purchase Unit *</label>
                 <select name="unit[]" class="purchase-unit" onchange="updateUnitDisplay(this)">
+                    <option value="pcs" selected>pcs</option>
                     <option value="tray">tray</option>
                     <option value="box">box</option>
                     <option value="case">case</option>
@@ -197,7 +330,6 @@ function addPurchaseItem() {
                     <option value="pack">pack</option>
                     <option value="kg">kg</option>
                     <option value="L">L</option>
-                    <option value="pcs">pcs</option>
                 </select>
             </div>
             <div class="form-group">
@@ -205,6 +337,9 @@ function addPurchaseItem() {
                 <input type="number" name="price[]" step="0.01" min="0" placeholder="7.00" required>
             </div>
         </div>
+
+        <!-- Hidden flag to track if conversion is active -->
+        <input type="hidden" name="conv_active[]" class="conv-active-flag" value="0">
 
         <!-- Conversion Toggle -->
         <div class="conversion-toggle-row">
@@ -221,10 +356,16 @@ function addPurchaseItem() {
             <div class="conversion-inputs">
                 <span class="conv-equals">1</span>
                 <select class="conv-from-unit" onchange="syncPurchaseUnit(this)">
-                    <option value="tray">tray</option>
-                    <option value="can">can</option>
-                    <option value="bag">bag</option>
                     <option value="pcs">pcs</option>
+                    <option value="tray">tray</option>
+                    <option value="box">box</option>
+                    <option value="case">case</option>
+                    <option value="can">can</option>
+                    <option value="bottle">bottle</option>
+                    <option value="bag">bag</option>
+                    <option value="pack">pack</option>
+                    <option value="kg">kg</option>
+                    <option value="L">L</option>
                 </select>
                 <span class="conv-equals">=</span>
                 <input type="number" name="conv_factor[]" step="0.01" min="0.01" value="1" placeholder="Qty" class="conv-factor">
@@ -247,21 +388,22 @@ function toggleConversion(checkbox) {
     const convToUnit = card.querySelector('.conv-to-unit');
     const purchaseUnit = card.querySelector('.purchase-unit');
     const convFromUnit = card.querySelector('.conv-from-unit');
+    const convActiveFlag = card.querySelector('.conv-active-flag');
 
     if (checkbox.checked) {
+        convActiveFlag.value = '1';
         convRow.style.display = 'block';
         const puVal = purchaseUnit.value;
-        if (['tray','can','bag','pcs'].includes(puVal)) {
-            convFromUnit.value = puVal;
-        } else {
-            convFromUnit.value = 'pcs';
-        }
+        // Default "from" unit = the purchase unit (any unit)
+        convFromUnit.value = puVal;
+        // Smart default for "to" unit
         if (puVal === 'kg' || puVal === 'L') {
             convToUnit.value = 'pcs';
         } else {
             convToUnit.value = 'kg';
         }
     } else {
+        convActiveFlag.value = '0';
         convRow.style.display = 'none';
         convFactor.value = '1';
         convToUnit.value = purchaseUnit.value;
@@ -280,10 +422,8 @@ function updateUnitDisplay(select) {
     const convToggle = card.querySelector('.conv-toggle');
 
     if (convFromUnit && convToggle && convToggle.checked) {
-        const val = select.value;
-        if (['tray','can','bag','pcs'].includes(val)) {
-            convFromUnit.value = val;
-        }
+        // Always sync "from" unit with purchase unit, regardless of which unit it is
+        convFromUnit.value = select.value;
     }
 }
 

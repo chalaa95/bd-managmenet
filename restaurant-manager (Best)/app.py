@@ -83,152 +83,161 @@ def init_db():
     # Users/Workers
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT,
-    role TEXT DEFAULT 'Waiter',
-    phone TEXT,
-    password TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT,
+        role TEXT DEFAULT 'Waiter',
+        phone TEXT,
+        password TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Categories
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     # Articles (raw materials / ingredients)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS articles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    unit TEXT DEFAULT 'kg',
-    stock_qty REAL DEFAULT 0,
-    avg_cost REAL DEFAULT 0,
-    min_stock REAL DEFAULT 10,
-    location TEXT DEFAULT 'Storage Room',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        unit TEXT DEFAULT 'kg',
+        stock_qty REAL DEFAULT 0,
+        avg_cost REAL DEFAULT 0,
+        min_stock REAL DEFAULT 10,
+        location TEXT DEFAULT 'Storage Room',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     # Products (menu items for sale)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT,
-    price REAL NOT NULL,
-    category TEXT DEFAULT 'Food',
-    is_active INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        price REAL NOT NULL,
+        category TEXT DEFAULT 'Food',
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     # Product Recipes / BOM
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS product_recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER,
-    article_id INTEGER,
-    quantity_needed REAL,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER,
+        article_id INTEGER,
+        quantity_needed REAL,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
     )
     """)
 
     # Purchases
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS purchases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    supplier TEXT NOT NULL,
-    invoice_number TEXT,
-    total_amount REAL DEFAULT 0,
-    status TEXT DEFAULT 'Ordered',
-    ordered_by TEXT,
-    order_date TEXT DEFAULT CURRENT_TIMESTAMP,
-    received_at TEXT
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supplier TEXT NOT NULL,
+        invoice_number TEXT,
+        total_amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'Ordered',
+        ordered_by TEXT,
+        order_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        received_at TEXT
     )
     """)
 
     # Purchase Items
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS purchase_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    purchase_id INTEGER,
-    article_id INTEGER,
-    item_name TEXT,
-    quantity REAL,
-    unit TEXT,
-    unit_price REAL,
-    total REAL,
-    conversion_factor REAL DEFAULT 1,
-    storage_unit TEXT,
-    storage_qty REAL,
-    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
-    FOREIGN KEY (article_id) REFERENCES articles(id)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        purchase_id INTEGER,
+        article_id INTEGER,
+        item_name TEXT,
+        quantity REAL,
+        unit TEXT,
+        unit_price REAL,
+        total REAL,
+        conversion_factor REAL DEFAULT 1,
+        storage_unit TEXT,
+        storage_qty REAL,
+        FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+        FOREIGN KEY (article_id) REFERENCES articles(id)
     )
     """)
 
     # Sales
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sales (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_number TEXT UNIQUE,
-    table_number TEXT,
-    status TEXT DEFAULT 'Pending',
-    total_amount REAL DEFAULT 0,
-    discount_value REAL DEFAULT 0,
-    discount_type TEXT DEFAULT 'fixed',
-    discount_amount REAL DEFAULT 0,
-    payment_method TEXT DEFAULT 'Cash',
-    cashier_name TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    completed_at TEXT
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_number TEXT UNIQUE,
+        table_number TEXT,
+        status TEXT DEFAULT 'Pending',
+        total_amount REAL DEFAULT 0,
+        discount_value REAL DEFAULT 0,
+        discount_type TEXT DEFAULT 'fixed',
+        discount_amount REAL DEFAULT 0,
+        payment_method TEXT DEFAULT 'Cash',
+        cashier_name TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT
     )
     """)
 
     # Pre-Products (intermediate manufactured items)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pre_products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    unit TEXT DEFAULT 'kg',
-    yield_qty REAL DEFAULT 1,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        unit TEXT DEFAULT 'kg',
+        yield_qty REAL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     # Pre-Product Recipes (what articles go into a pre-product)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pre_product_recipes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    pre_product_id INTEGER,
-    article_id INTEGER,
-    quantity_needed REAL,
-    FOREIGN KEY (pre_product_id) REFERENCES pre_products(id) ON DELETE CASCADE,
-    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pre_product_id INTEGER,
+        article_id INTEGER,
+        quantity_needed REAL,
+        FOREIGN KEY (pre_product_id) REFERENCES pre_products(id) ON DELETE CASCADE,
+        FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
     )
     """)
 
     # Product Pre-Products (final products can use pre-products)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS product_pre_products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER,
-    pre_product_id INTEGER,
-    quantity_needed REAL,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (pre_product_id) REFERENCES pre_products(id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER,
+        pre_product_id INTEGER,
+        quantity_needed REAL,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        FOREIGN KEY (pre_product_id) REFERENCES pre_products(id) ON DELETE CASCADE
     )
     """)
 
     # Sale Items
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sale_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sale_id INTEGER,
-    product_id INTEGER,
-    product_name TEXT,
-    quantity INTEGER,
-    unit_price REAL,
-    total REAL,
-    FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id INTEGER,
+        product_id INTEGER,
+        product_name TEXT,
+        quantity INTEGER,
+        unit_price REAL,
+        total REAL,
+        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
     )
     """)
 
@@ -271,6 +280,23 @@ def migrate_db():
         cursor.execute("UPDATE users SET password = ?", (default_hash,))
         print("Migrated: added password column to users")
 
+    # Check if categories table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'")
+    if not cursor.fetchone():
+        cursor.execute("""
+        CREATE TABLE categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Food',))
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Drinks',))
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Desserts',))
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Sides',))
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Other',))
+        print("Migrated: created categories table")
+
     # Ensure default Manager exists
     cursor.execute("SELECT * FROM users WHERE role = 'Manager' LIMIT 1")
     if not cursor.fetchone():
@@ -295,45 +321,52 @@ def seed_data():
 
     # Workers
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
-    ('Manager', 'manager@restaurant.com', 'Manager', '555-0100', manager_hash))
+        ('Manager', 'manager@restaurant.com', 'Manager', '555-0100', manager_hash))
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
-    ('John Smith', 'john@restaurant.com', 'Chef', '555-0101', chef_hash))
+        ('John Smith', 'john@restaurant.com', 'Chef', '555-0101', chef_hash))
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
-    ('Sarah Jones', 'sarah@restaurant.com', 'Waiter', '555-0102', waiter_hash))
+        ('Sarah Jones', 'sarah@restaurant.com', 'Waiter', '555-0102', waiter_hash))
+
+    # Categories
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Food',))
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Drinks',))
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Desserts',))
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Sides',))
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Other',))
 
     # Articles
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Flour', 'kg', 50, 2.5, 10, 'Storage Room'))
+        ('Flour', 'kg', 50, 2.5, 10, 'Storage Room'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Mozzarella Cheese', 'kg', 20, 8.0, 5, 'Fridge'))
+        ('Mozzarella Cheese', 'kg', 20, 8.0, 5, 'Fridge'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Tomato Sauce', 'L', 15, 3.5, 3, 'Fridge'))
+        ('Tomato Sauce', 'L', 15, 3.5, 3, 'Fridge'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Pasta', 'kg', 30, 3.0, 5, 'Storage Room'))
+        ('Pasta', 'kg', 30, 3.0, 5, 'Storage Room'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Bacon', 'kg', 10, 12.0, 2, 'Fridge'))
+        ('Bacon', 'kg', 10, 12.0, 2, 'Fridge'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Coca Cola Cans', 'can', 100, 0.8, 20, 'Storage Room'))
+        ('Coca Cola Cans', 'can', 100, 0.8, 20, 'Storage Room'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
-    ('Orange', 'kg', 25, 2.0, 5, 'Fridge'))
+        ('Orange', 'kg', 25, 2.0, 5, 'Fridge'))
 
     # Products
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
-    ('Margherita Pizza', 'Classic tomato and mozzarella', 12.99, 'Food'))
+        ('Margherita Pizza', 'Classic tomato and mozzarella', 12.99, 'Food'))
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
-    ('Pasta Carbonara', 'Creamy bacon pasta', 14.99, 'Food'))
+        ('Pasta Carbonara', 'Creamy bacon pasta', 14.99, 'Food'))
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
-    ('Caesar Salad', 'Fresh romaine with dressing', 9.99, 'Food'))
+        ('Caesar Salad', 'Fresh romaine with dressing', 9.99, 'Food'))
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
-    ('Coca Cola', '330ml can', 2.50, 'Drinks'))
+        ('Coca Cola', '330ml can', 2.50, 'Drinks'))
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
-    ('Orange Juice', 'Freshly squeezed', 4.99, 'Drinks'))
+        ('Orange Juice', 'Freshly squeezed', 4.99, 'Drinks'))
 
     # Pre-Products
     cursor.execute("INSERT INTO pre_products (name, unit, yield_qty) VALUES (?, ?, ?)",
-    ('Mayonnaise', 'kg', 8))
+        ('Mayonnaise', 'kg', 8))
     cursor.execute("INSERT INTO pre_products (name, unit, yield_qty) VALUES (?, ?, ?)",
-    ('Tomato Sauce Base', 'L', 5))
+        ('Tomato Sauce Base', 'L', 5))
 
     # Pre-Product Recipes
     cursor.execute("INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 1, 4))
@@ -398,23 +431,23 @@ def get_product_cost(product_id):
 
     # Direct articles cost
     cursor.execute("""
-    SELECT SUM(pr.quantity_needed * a.avg_cost) as total_cost
-    FROM product_recipes pr
-    JOIN articles a ON pr.article_id = a.id
-    WHERE pr.product_id = ?
+        SELECT SUM(pr.quantity_needed * a.avg_cost) as total_cost
+        FROM product_recipes pr
+        JOIN articles a ON pr.article_id = a.id
+        WHERE pr.product_id = ?
     """, (product_id,))
     article_cost = cursor.fetchone()['total_cost'] or 0
 
     # Pre-products cost
     cursor.execute("""
-    SELECT ppp.quantity_needed, pp.yield_qty,
-    (SELECT SUM(ppr.quantity_needed * a.avg_cost)
-    FROM pre_product_recipes ppr
-    JOIN articles a ON ppr.article_id = a.id
-    WHERE ppr.pre_product_id = pp.id) as pre_cost
-    FROM product_pre_products ppp
-    JOIN pre_products pp ON ppp.pre_product_id = pp.id
-    WHERE ppp.product_id = ?
+        SELECT ppp.quantity_needed, pp.yield_qty,
+            (SELECT SUM(ppr.quantity_needed * a.avg_cost)
+             FROM pre_product_recipes ppr
+             JOIN articles a ON ppr.article_id = a.id
+             WHERE ppr.pre_product_id = pp.id) as pre_cost
+        FROM product_pre_products ppp
+        JOIN pre_products pp ON ppp.pre_product_id = pp.id
+        WHERE ppp.product_id = ?
     """, (product_id,))
     pre_items = cursor.fetchall()
 
@@ -431,10 +464,10 @@ def get_product_recipe(product_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT pr.*, a.name as article_name, a.unit as article_unit, a.avg_cost
-    FROM product_recipes pr
-    JOIN articles a ON pr.article_id = a.id
-    WHERE pr.product_id = ?
+        SELECT pr.*, a.name as article_name, a.unit as article_unit, a.avg_cost
+        FROM product_recipes pr
+        JOIN articles a ON pr.article_id = a.id
+        WHERE pr.product_id = ?
     """, (product_id,))
     recipe = rows_to_dict(cursor.fetchall())
     conn.close()
@@ -445,11 +478,11 @@ def get_pre_product_cost(pre_product_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT SUM(ppr.quantity_needed * a.avg_cost) as total_cost, pp.yield_qty
-    FROM pre_product_recipes ppr
-    JOIN articles a ON ppr.article_id = a.id
-    JOIN pre_products pp ON ppr.pre_product_id = pp.id
-    WHERE ppr.pre_product_id = ?
+        SELECT SUM(ppr.quantity_needed * a.avg_cost) as total_cost, pp.yield_qty
+        FROM pre_product_recipes ppr
+        JOIN articles a ON ppr.article_id = a.id
+        JOIN pre_products pp ON ppr.pre_product_id = pp.id
+        WHERE ppr.pre_product_id = ?
     """, (pre_product_id,))
     result = cursor.fetchone()
     conn.close()
@@ -461,10 +494,10 @@ def get_pre_product_recipe(pre_product_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT ppr.*, a.name as article_name, a.unit as article_unit, a.avg_cost
-    FROM pre_product_recipes ppr
-    JOIN articles a ON ppr.article_id = a.id
-    WHERE ppr.pre_product_id = ?
+        SELECT ppr.*, a.name as article_name, a.unit as article_unit, a.avg_cost
+        FROM pre_product_recipes ppr
+        JOIN articles a ON ppr.article_id = a.id
+        WHERE ppr.pre_product_id = ?
     """, (pre_product_id,))
     recipe = rows_to_dict(cursor.fetchall())
     conn.close()
@@ -474,10 +507,10 @@ def get_product_pre_products(product_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT ppp.*, pp.name as pre_product_name, pp.unit as pre_product_unit, pp.yield_qty
-    FROM product_pre_products ppp
-    JOIN pre_products pp ON ppp.pre_product_id = pp.id
-    WHERE ppp.product_id = ?
+        SELECT ppp.*, pp.name as pre_product_name, pp.unit as pre_product_unit, pp.yield_qty
+        FROM product_pre_products ppp
+        JOIN pre_products pp ON ppp.pre_product_id = pp.id
+        WHERE ppp.product_id = ?
     """, (product_id,))
     items = rows_to_dict(cursor.fetchall())
     conn.close()
@@ -504,29 +537,29 @@ def dashboard():
     total_workers = cursor.fetchone()[0]
 
     cursor.execute("""
-    SELECT s.*, GROUP_CONCAT(si.product_name || ' (x' || si.quantity || ')', ', ') as items
-    FROM sales s
-    LEFT JOIN sale_items si ON s.id = si.sale_id
-    GROUP BY s.id
-    ORDER BY s.created_at DESC
-    LIMIT 5
+        SELECT s.*, GROUP_CONCAT(si.product_name || ' (x' || si.quantity || ')', ', ') as items
+        FROM sales s
+        LEFT JOIN sale_items si ON s.id = si.sale_id
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT 5
     """)
     recent_sales = rows_to_dict(cursor.fetchall())
 
     cursor.execute("""
-    SELECT * FROM articles
-    WHERE stock_qty <= min_stock
-    ORDER BY stock_qty ASC
-    LIMIT 10
+        SELECT * FROM articles
+        WHERE stock_qty <= min_stock
+        ORDER BY stock_qty ASC
+        LIMIT 10
     """)
     low_stock_items = rows_to_dict(cursor.fetchall())
 
     cursor.execute("""
-    SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as total
-    FROM sales
-    WHERE DATE(created_at) >= DATE('now', '-6 days')
-    GROUP BY DATE(created_at)
-    ORDER BY date
+        SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as total
+        FROM sales
+        WHERE DATE(created_at) >= DATE('now', '-6 days')
+        GROUP BY DATE(created_at)
+        ORDER BY date
     """)
     chart_data = rows_to_dict(cursor.fetchall())
 
@@ -535,15 +568,15 @@ def dashboard():
     current_date = datetime.now().strftime("%A, %B %d, %Y")
 
     return render_template('dashboard.html',
-    today_orders=today_sales[0] or 0,
-    today_revenue=round(today_sales[1] or 0, 2),
-    total_products=total_products,
-    low_stock=low_stock,
-    total_workers=total_workers,
-    recent_sales=recent_sales,
-    low_stock_items=low_stock_items,
-    chart_data=chart_data,
-    current_date=current_date)
+        today_orders=today_sales[0] or 0,
+        today_revenue=round(today_sales[1] or 0, 2),
+        total_products=total_products,
+        low_stock=low_stock,
+        total_workers=total_workers,
+        recent_sales=recent_sales,
+        low_stock_items=low_stock_items,
+        chart_data=chart_data,
+        current_date=current_date)
 
 # ==================== PRODUCTS ====================
 @app.route('/products')
@@ -568,8 +601,32 @@ def products():
     for pp in pre_products_list:
         pp['cost_per_unit'] = get_pre_product_cost(pp['id'])
 
+    cursor.execute("SELECT * FROM categories ORDER BY name")
+    categories = rows_to_dict(cursor.fetchall())
+
+    # Fetch recipes for edit modal
+    cursor.execute("SELECT product_id, article_id, quantity_needed FROM product_recipes")
+    all_recipes = rows_to_dict(cursor.fetchall())
+    product_recipes_map = {}
+    for r in all_recipes:
+        pid = r['product_id']
+        if pid not in product_recipes_map:
+            product_recipes_map[pid] = []
+        product_recipes_map[pid].append(r)
+
+    cursor.execute("SELECT product_id, pre_product_id, quantity_needed FROM product_pre_products")
+    all_pre = rows_to_dict(cursor.fetchall())
+    product_pre_map = {}
+    for r in all_pre:
+        pid = r['product_id']
+        if pid not in product_pre_map:
+            product_pre_map[pid] = []
+        product_pre_map[pid].append(r)
+
     conn.close()
-    return render_template('products.html', products=products, articles=articles, pre_products=pre_products_list)
+    return render_template('products.html', products=products, articles=articles,
+                           pre_products=pre_products_list, categories=categories,
+                           product_recipes_map=product_recipes_map, product_pre_map=product_pre_map)
 
 @app.route('/products/add', methods=['POST'])
 @manager_or_chef
@@ -577,10 +634,10 @@ def add_product():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    INSERT INTO products (name, description, price, category)
-    VALUES (?, ?, ?, ?)
+        INSERT INTO products (name, description, price, category)
+        VALUES (?, ?, ?, ?)
     """, (request.form['name'], request.form.get('description', ''),
-    float(request.form['price']), request.form.get('category', 'Food')))
+        float(request.form['price']), request.form.get('category', 'Food')))
     product_id = cursor.lastrowid
 
     # Add direct article components
@@ -589,8 +646,8 @@ def add_product():
     for i, aid in enumerate(article_ids):
         if aid and quantities[i] and float(quantities[i]) > 0:
             cursor.execute("""
-            INSERT INTO product_recipes (product_id, article_id, quantity_needed)
-            VALUES (?, ?, ?)
+                INSERT INTO product_recipes (product_id, article_id, quantity_needed)
+                VALUES (?, ?, ?)
             """, (product_id, int(aid), float(quantities[i])))
 
     # Add pre-product components
@@ -599,8 +656,8 @@ def add_product():
     for i, pid in enumerate(pre_product_ids):
         if pid and pre_quantities[i] and float(pre_quantities[i]) > 0:
             cursor.execute("""
-            INSERT INTO product_pre_products (product_id, pre_product_id, quantity_needed)
-            VALUES (?, ?, ?)
+                INSERT INTO product_pre_products (product_id, pre_product_id, quantity_needed)
+                VALUES (?, ?, ?)
             """, (product_id, int(pid), float(pre_quantities[i])))
 
     conn.commit()
@@ -614,10 +671,99 @@ def delete_product(id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM product_recipes WHERE product_id = ?", (id,))
+    cursor.execute("DELETE FROM product_pre_products WHERE product_id = ?", (id,))
     cursor.execute("DELETE FROM products WHERE id = ?", (id,))
     conn.commit()
     conn.close()
     flash('Product deleted!', 'success')
+    return redirect('/products')
+
+@app.route('/products/edit/<int:id>', methods=['POST'])
+@manager_or_chef
+def edit_product(id):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Update product info
+    cursor.execute("""
+        UPDATE products SET name = ?, description = ?, price = ?, category = ?
+        WHERE id = ?
+    """, (request.form['name'], request.form.get('description', ''),
+        float(request.form['price']), request.form.get('category', 'Food'), id))
+
+    # Clear old recipes
+    cursor.execute("DELETE FROM product_recipes WHERE product_id = ?", (id,))
+    cursor.execute("DELETE FROM product_pre_products WHERE product_id = ?", (id,))
+
+    # Add new article components
+    article_ids = request.form.getlist('recipe_article_id[]')
+    quantities = request.form.getlist('recipe_qty[]')
+    for i, aid in enumerate(article_ids):
+        if aid and quantities[i] and float(quantities[i]) > 0:
+            cursor.execute("""
+                INSERT INTO product_recipes (product_id, article_id, quantity_needed)
+                VALUES (?, ?, ?)
+            """, (id, int(aid), float(quantities[i])))
+
+    # Add new pre-product components
+    pre_product_ids = request.form.getlist('recipe_pre_product_id[]')
+    pre_quantities = request.form.getlist('recipe_pre_qty[]')
+    for i, pid in enumerate(pre_product_ids):
+        if pid and pre_quantities[i] and float(pre_quantities[i]) > 0:
+            cursor.execute("""
+                INSERT INTO product_pre_products (product_id, pre_product_id, quantity_needed)
+                VALUES (?, ?, ?)
+            """, (id, int(pid), float(pre_quantities[i])))
+
+    conn.commit()
+    conn.close()
+    flash('Product updated successfully!', 'success')
+    return redirect('/products')
+
+# ==================== CATEGORIES ====================
+@app.route('/categories/add', methods=['POST'])
+@manager_or_chef
+def add_category():
+    name = request.form.get('name', '').strip()
+    if not name:
+        flash('Category name is required.', 'error')
+        return redirect('/products')
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO categories (name) VALUES (?)", (name,))
+        conn.commit()
+        flash(f'Category "{name}" added!', 'success')
+    except sqlite3.IntegrityError:
+        flash(f'Category "{name}" already exists.', 'error')
+    conn.close()
+    return redirect('/products')
+
+@app.route('/categories/delete/<int:id>')
+@manager_or_chef
+def delete_category(id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM categories WHERE id = ?", (id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        flash('Category not found.', 'error')
+        return redirect('/products')
+
+    cat_name = row['name']
+    # Check if any products use this category
+    cursor.execute("SELECT COUNT(*) FROM products WHERE category = ?", (cat_name,))
+    count = cursor.fetchone()[0]
+    if count > 0:
+        conn.close()
+        flash(f'Cannot delete: {count} product(s) are using this category. Reassign them first.', 'error')
+        return redirect('/products')
+
+    cursor.execute("DELETE FROM categories WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash(f'Category "{cat_name}" deleted!', 'success')
     return redirect('/products')
 
 # ==================== STORAGE / ARTICLES ====================
@@ -637,10 +783,10 @@ def update_article(id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    UPDATE articles SET stock_qty = ?, min_stock = ?, location = ?, unit = ?, name = ?
-    WHERE id = ?
+        UPDATE articles SET stock_qty = ?, min_stock = ?, location = ?, unit = ?, name = ?
+        WHERE id = ?
     """, (float(request.form['quantity']), float(request.form['min_stock']),
-    request.form['location'], request.form['unit'], request.form['name'], id))
+        request.form['location'], request.form['unit'], request.form['name'], id))
     conn.commit()
     conn.close()
     flash('Article updated!', 'success')
@@ -674,20 +820,23 @@ def sales():
     products = rows_to_dict(cursor.fetchall())
 
     cursor.execute("""
-    SELECT s.*, GROUP_CONCAT(si.product_name || ' (x' || si.quantity || ')', ', ') as items
-    FROM sales s
-    LEFT JOIN sale_items si ON s.id = si.sale_id
-    GROUP BY s.id
-    ORDER BY s.created_at DESC
-    LIMIT 20
+        SELECT s.*, GROUP_CONCAT(si.product_name || ' (x' || si.quantity || ')', ', ') as items
+        FROM sales s
+        LEFT JOIN sale_items si ON s.id = si.sale_id
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT 20
     """)
     recent_sales = rows_to_dict(cursor.fetchall())
 
     cursor.execute("SELECT name FROM users")
     workers = rows_to_dict(cursor.fetchall())
 
+    cursor.execute("SELECT * FROM categories ORDER BY name")
+    categories = rows_to_dict(cursor.fetchall())
+
     conn.close()
-    return render_template('sales.html', products=products, recent_sales=recent_sales, workers=workers)
+    return render_template('sales.html', products=products, recent_sales=recent_sales, workers=workers, categories=categories)
 
 @app.route('/sales/create', methods=['POST'])
 @login_required
@@ -718,52 +867,52 @@ def create_sale():
                     'total': item_total
                 })
 
-                # Deduct direct recipe components (articles)
-                cursor.execute("""
+            # Deduct direct recipe components (articles)
+            cursor.execute("""
                 SELECT pr.quantity_needed, pr.article_id, a.stock_qty
                 FROM product_recipes pr
                 JOIN articles a ON pr.article_id = a.id
                 WHERE pr.product_id = ?
-                """, (prod_id,))
-                recipe = cursor.fetchall()
-                for comp in recipe:
-                    deduct_qty = comp['quantity_needed'] * qty
-                    new_qty = comp['stock_qty'] - deduct_qty
-                    if new_qty < 0:
-                        new_qty = 0
-                    cursor.execute("""
-                    UPDATE articles SET stock_qty = ? WHERE id = ?
-                    """, (new_qty, comp['article_id']))
-
-                # Deduct pre-product components (explode BOM to raw materials)
+            """, (prod_id,))
+            recipe = cursor.fetchall()
+            for comp in recipe:
+                deduct_qty = comp['quantity_needed'] * qty
+                new_qty = comp['stock_qty'] - deduct_qty
+                if new_qty < 0:
+                    new_qty = 0
                 cursor.execute("""
+                    UPDATE articles SET stock_qty = ? WHERE id = ?
+                """, (new_qty, comp['article_id']))
+
+            # Deduct pre-product components (explode BOM to raw materials)
+            cursor.execute("""
                 SELECT ppp.quantity_needed, ppp.pre_product_id, pp.yield_qty
                 FROM product_pre_products ppp
                 JOIN pre_products pp ON ppp.pre_product_id = pp.id
                 WHERE ppp.product_id = ?
-                """, (prod_id,))
-                pre_products_used = cursor.fetchall()
+            """, (prod_id,))
+            pre_products_used = cursor.fetchall()
 
-                for ppu in pre_products_used:
-                    pre_qty_needed = ppu['quantity_needed'] * qty
-                    ratio = pre_qty_needed / ppu['yield_qty'] if ppu['yield_qty'] > 0 else 0
+            for ppu in pre_products_used:
+                pre_qty_needed = ppu['quantity_needed'] * qty
+                ratio = pre_qty_needed / ppu['yield_qty'] if ppu['yield_qty'] > 0 else 0
 
-                    cursor.execute("""
+                cursor.execute("""
                     SELECT ppr.quantity_needed, ppr.article_id, a.stock_qty
                     FROM pre_product_recipes ppr
                     JOIN articles a ON ppr.article_id = a.id
                     WHERE ppr.pre_product_id = ?
-                    """, (ppu['pre_product_id'],))
-                    pre_recipe = cursor.fetchall()
+                """, (ppu['pre_product_id'],))
+                pre_recipe = cursor.fetchall()
 
-                    for pre_comp in pre_recipe:
-                        deduct_qty = pre_comp['quantity_needed'] * ratio
-                        new_qty = pre_comp['stock_qty'] - deduct_qty
-                        if new_qty < 0:
-                            new_qty = 0
-                        cursor.execute("""
+                for pre_comp in pre_recipe:
+                    deduct_qty = pre_comp['quantity_needed'] * ratio
+                    new_qty = pre_comp['stock_qty'] - deduct_qty
+                    if new_qty < 0:
+                        new_qty = 0
+                    cursor.execute("""
                         UPDATE articles SET stock_qty = ? WHERE id = ?
-                        """, (new_qty, pre_comp['article_id']))
+                    """, (new_qty, pre_comp['article_id']))
 
     discount_val = float(request.form.get('discount_value', 0))
     discount_type = request.form.get('discount_type', 'fixed')
@@ -783,17 +932,17 @@ def create_sale():
         grand_total = 0
 
     cursor.execute("""
-    INSERT INTO sales (order_number, table_number, status, total_amount, discount_value, discount_type, discount_amount, payment_method, cashier_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sales (order_number, table_number, status, total_amount, discount_value, discount_type, discount_amount, payment_method, cashier_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (order_num, request.form.get('table_number', ''), 'Completed', grand_total, discount_val, discount_type, discount_amount,
-    request.form.get('payment_method', 'Cash'), request.form.get('cashier', '')))
+        request.form.get('payment_method', 'Cash'), request.form.get('cashier', '')))
 
     sale_id = cursor.lastrowid
 
     for item in sale_items:
         cursor.execute("""
-        INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, total)
-        VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, total)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (sale_id, item['product_id'], item['name'], item['qty'], item['price'], item['total']))
 
     conn.commit()
@@ -820,17 +969,28 @@ def purchases():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT p.*, GROUP_CONCAT(pi.item_name || ' (x' || pi.quantity || ' ' || pi.unit || ')', ', ') as items
-    FROM purchases p
-    LEFT JOIN purchase_items pi ON p.id = pi.purchase_id
-    GROUP BY p.id
-    ORDER BY p.order_date DESC
+        SELECT p.*, GROUP_CONCAT(pi.item_name || ' (x' || pi.quantity || ' ' || pi.unit || ')', ', ') as item_summary
+        FROM purchases p
+        LEFT JOIN purchase_items pi ON p.id = pi.purchase_id
+        GROUP BY p.id
+        ORDER BY p.order_date DESC
     """)
     purchases = rows_to_dict(cursor.fetchall())
+
+    # Fetch all purchase items grouped by purchase_id for detail view
+    cursor.execute("SELECT * FROM purchase_items ORDER BY purchase_id, id")
+    all_items = rows_to_dict(cursor.fetchall())
+    purchase_items_map = {}
+    for item in all_items:
+        pid = item['purchase_id']
+        if pid not in purchase_items_map:
+            purchase_items_map[pid] = []
+        purchase_items_map[pid].append(item)
+
     cursor.execute("SELECT name FROM users")
     workers = rows_to_dict(cursor.fetchall())
     conn.close()
-    return render_template('purchases.html', purchases=purchases, workers=workers)
+    return render_template('purchases.html', purchases=purchases, workers=workers, purchase_items_map=purchase_items_map)
 
 @app.route('/purchases/add', methods=['POST'])
 @manager_or_chef
@@ -839,8 +999,8 @@ def add_purchase():
     cursor = conn.cursor()
 
     cursor.execute("""
-    INSERT INTO purchases (supplier, invoice_number, status, ordered_by)
-    VALUES (?, ?, ?, ?)
+        INSERT INTO purchases (supplier, invoice_number, status, ordered_by)
+        VALUES (?, ?, ?, ?)
     """, (request.form['supplier'], request.form.get('invoice', ''), 'Ordered', request.form.get('ordered_by', '')))
 
     purchase_id = cursor.lastrowid
@@ -851,6 +1011,7 @@ def add_purchase():
     prices = request.form.getlist('price[]')
     conv_factors = request.form.getlist('conv_factor[]')
     storage_units = request.form.getlist('storage_unit[]')
+    conv_active_flags = request.form.getlist('conv_active[]')
 
     total = 0
     for i, name in enumerate(items):
@@ -858,9 +1019,20 @@ def add_purchase():
             qty = float(quantities[i])
             price = float(prices[i])
             unit = units[i]
-            conv_factor = float(conv_factors[i]) if i < len(conv_factors) and conv_factors[i] else 1
-            storage_unit = storage_units[i] if i < len(storage_units) and storage_units[i] else unit
-            storage_qty = qty * conv_factor
+
+            # Check if conversion is active for this item
+            is_conv_active = (i < len(conv_active_flags) and conv_active_flags[i] == '1')
+
+            if is_conv_active:
+                conv_factor = float(conv_factors[i]) if i < len(conv_factors) and conv_factors[i] else 1
+                storage_unit = storage_units[i] if i < len(storage_units) and storage_units[i] else unit
+                storage_qty = qty * conv_factor
+            else:
+                # No conversion: storage unit = purchase unit, storage qty = purchase qty
+                conv_factor = 1
+                storage_unit = unit
+                storage_qty = qty
+
             item_total = price * qty
             total += item_total
 
@@ -872,21 +1044,21 @@ def add_purchase():
                 old_qty = article['stock_qty'] or 0
                 old_cost = article['avg_cost'] or 0
                 new_qty = old_qty + storage_qty
-                new_avg = ((old_qty * old_cost) + item_total) / new_qty if new_qty > 0 else price / conv_factor
+                new_avg = ((old_qty * old_cost) + item_total) / new_qty if new_qty > 0 else price / conv_factor if conv_factor > 0 else price
                 cursor.execute("""
-                UPDATE articles SET stock_qty = ?, avg_cost = ?, unit = ? WHERE id = ?
+                    UPDATE articles SET stock_qty = ?, avg_cost = ?, unit = ? WHERE id = ?
                 """, (new_qty, round(new_avg, 2), storage_unit, article_id))
             else:
                 avg_cost = item_total / storage_qty if storage_qty > 0 else price
                 cursor.execute("""
-                INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock)
-                VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock)
+                    VALUES (?, ?, ?, ?, ?)
                 """, (name.strip(), storage_unit, storage_qty, round(avg_cost, 2), 10))
                 article_id = cursor.lastrowid
 
             cursor.execute("""
-            INSERT INTO purchase_items (purchase_id, article_id, item_name, quantity, unit, unit_price, total, conversion_factor, storage_unit, storage_qty)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO purchase_items (purchase_id, article_id, item_name, quantity, unit, unit_price, total, conversion_factor, storage_unit, storage_qty)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (purchase_id, article_id, name.strip(), qty, unit, price, item_total, conv_factor, storage_unit, storage_qty))
 
     cursor.execute("UPDATE purchases SET total_amount = ? WHERE id = ?", (total, purchase_id))
@@ -932,8 +1104,8 @@ def add_pre_product():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    INSERT INTO pre_products (name, unit, yield_qty)
-    VALUES (?, ?, ?)
+        INSERT INTO pre_products (name, unit, yield_qty)
+        VALUES (?, ?, ?)
     """, (request.form['name'], request.form.get('unit', 'kg'), float(request.form.get('yield_qty', 1))))
     pre_product_id = cursor.lastrowid
 
@@ -942,8 +1114,8 @@ def add_pre_product():
     for i, aid in enumerate(article_ids):
         if aid and quantities[i] and float(quantities[i]) > 0:
             cursor.execute("""
-            INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed)
-            VALUES (?, ?, ?)
+                INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed)
+                VALUES (?, ?, ?)
             """, (pre_product_id, int(aid), float(quantities[i])))
 
     conn.commit()
@@ -982,10 +1154,10 @@ def add_worker():
     cursor = conn.cursor()
     password_hash = generate_password_hash(request.form['password'])
     cursor.execute("""
-    INSERT INTO users (name, email, role, phone, password)
-    VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (name, email, role, phone, password)
+        VALUES (?, ?, ?, ?, ?)
     """, (request.form['name'], request.form.get('email', ''),
-          request.form.get('role', 'Waiter'), request.form.get('phone', ''), password_hash))
+        request.form.get('role', 'Waiter'), request.form.get('phone', ''), password_hash))
     conn.commit()
     conn.close()
     flash('Worker added successfully!', 'success')
