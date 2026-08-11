@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="RestoManager">
     <title>{% block title %}Restaurant Manager{% endblock %}</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -12,10 +18,10 @@
     <!-- Mobile Header -->
     <div class="mobile-header">
         <div style="display:flex;align-items:center;gap:10px;">
-            <span class="logo-icon">🍽️</span>
+            <span class="logo-icon" style="font-size:24px;">🍽️</span>
             <span class="logo-text">RestoManager</span>
         </div>
-        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">☰</button>
     </div>
 
     <!-- Sidebar Overlay -->
@@ -28,33 +34,42 @@
                 <span class="logo-text">RestoManager</span>
             </div>
             <nav class="nav-menu">
+                {% set perms = get_role_permissions(current_user.role) %}
                 <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
                     <span class="nav-icon">📊</span>
                     <span>Dashboard</span>
                 </a>
+                {% if 'sales' in perms %}
                 <a href="/sales" class="nav-item {% if request.path == '/sales' %}active{% endif %}">
                     <span class="nav-icon">🛒</span>
                     <span>Sales / POS</span>
                 </a>
-                {% if current_user.role in ['Manager', 'Chef'] %}
+                {% endif %}
+                {% if 'products' in perms %}
                 <a href="/products" class="nav-item {% if request.path == '/products' %}active{% endif %}">
                     <span class="nav-icon">🍕</span>
                     <span>Products</span>
                 </a>
+                {% endif %}
+                {% if 'storage' in perms %}
                 <a href="/storage" class="nav-item {% if request.path == '/storage' %}active{% endif %}">
                     <span class="nav-icon">📦</span>
                     <span>Storage</span>
                 </a>
+                {% endif %}
+                {% if 'pre_products' in perms %}
                 <a href="/pre-products" class="nav-item {% if request.path == '/pre-products' %}active{% endif %}">
                     <span class="nav-icon">🥣</span>
                     <span>Pre-Products</span>
                 </a>
+                {% endif %}
+                {% if 'purchases' in perms %}
                 <a href="/purchases" class="nav-item {% if request.path == '/purchases' %}active{% endif %}">
                     <span class="nav-icon">🚚</span>
                     <span>Purchases</span>
                 </a>
                 {% endif %}
-                {% if current_user.role == 'Manager' %}
+                {% if 'workers' in perms %}
                 <a href="/workers" class="nav-item {% if request.path == '/workers' %}active{% endif %}">
                     <span class="nav-icon">👥</span>
                     <span>Workers</span>
@@ -70,7 +85,7 @@
                     </div>
                 </div>
                 <a href="/logout" class="logout-link">🚪 Logout</a>
-                <p>© Data saved locally</p>
+                <p style="text-align:center;margin-top:8px;">© Data saved locally</p>
             </div>
         </aside>
     {% endif %}
@@ -94,6 +109,12 @@
     {% endif %}
 
     <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Service Worker registered'))
+                .catch(err => console.log('Service Worker failed', err));
+        }
+
         function openModal(id) {
             document.getElementById(id).classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -103,7 +124,6 @@
             document.body.style.overflow = '';
         }
 
-        // Close modal on backdrop click
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('modal') && e.target.classList.contains('active')) {
                 e.target.classList.remove('active');
@@ -111,7 +131,6 @@
             }
         });
 
-        // Mobile sidebar toggle
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -120,7 +139,6 @@
             document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
         }
 
-        // Close sidebar when clicking a nav link on mobile
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', function() {
                 if (window.innerWidth <= 768) {

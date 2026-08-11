@@ -5,7 +5,10 @@
 {% block content %}
 <div class="page-header">
     <h1>👥 Workers & Staff</h1>
-    <button class="btn btn-primary" onclick="openModal('addWorkerModal')">+ Add Worker</button>
+    <div class="page-header-actions">
+        <a href="/permissions" class="btn btn-secondary">🔐 Permissions</a>
+        <button class="btn btn-primary" onclick="openModal('addWorkerModal')">+ Add Worker</button>
+    </div>
 </div>
 
 <div class="card">
@@ -30,7 +33,10 @@
                     <td>{{ worker.phone or '-' }}</td>
                     <td class="cell-time">{{ worker.created_at[:10] if worker.created_at else '-' }}</td>
                     <td>
-                        <a href="/workers/delete/{{ worker.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Remove this worker?')">Remove</a>
+                        <div class="action-btns">
+                            <button class="btn btn-edit" onclick="openEditModal({{ worker.id }}, '{{ worker.name }}', '{{ worker.email }}', '{{ worker.role }}', '{{ worker.phone }}')">✏️ Edit</button>
+                            <a href="/workers/delete/{{ worker.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Remove this worker?')">Remove</a>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -67,6 +73,7 @@
                 <label>Role *</label>
                 <select name="role" required>
                     <option value="Waiter">Waiter</option>
+                    <option value="Cashier">Cashier</option>
                     <option value="Chef">Chef</option>
                     <option value="Manager">Manager</option>
                 </select>
@@ -82,4 +89,159 @@
         </form>
     </div>
 </div>
+
+<!-- Edit Worker Modal -->
+<div id="editWorkerModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>✏️ Edit Worker</h2>
+            <button class="modal-close" onclick="closeModal('editWorkerModal')">&times;</button>
+        </div>
+        <form action="" method="POST" id="editWorkerForm">
+            <input type="hidden" name="worker_id" id="editWorkerId">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" name="name" id="editName" required>
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" name="email" id="editEmail" required>
+                </div>
+                <div class="form-group">
+                    <label>New Password <small style="color:#94a3b8;font-weight:400;">(leave blank to keep current)</small></label>
+                    <input type="password" name="password" id="editPassword" placeholder="••••••">
+                </div>
+                <div class="form-group">
+                    <label>Role *</label>
+                    <select name="role" id="editRole" required onchange="updateEditPermissions()">
+                        <option value="Waiter">Waiter</option>
+                        <option value="Cashier">Cashier</option>
+                        <option value="Chef">Chef</option>
+                        <option value="Manager">Manager</option>
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <label>Phone</label>
+                    <input type="text" name="phone" id="editPhone" placeholder="555-0123">
+                </div>
+            </div>
+
+            <!-- Permissions Section -->
+            <div class="recipe-section" style="margin-top: 22px;">
+                <h4>🔐 Role Permissions</h4>
+                <p class="recipe-help" style="margin-bottom: 14px;">
+                    These permissions apply to <strong>all workers</strong> with this role. Check the sections this role can access.
+                </p>
+                <div class="permissions-grid" id="editPermissionsGrid">
+                    {% for section_key, section_label in sections %}
+                    <label class="perm-checkbox-label">
+                        <input type="checkbox" name="perm_{{ section_key }}" value="1" class="perm-check" data-section="{{ section_key }}">
+                        <span class="perm-check-box"></span>
+                        <span class="perm-check-text">{{ section_label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editWorkerModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+.perm-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.perm-checkbox-label:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+.perm-checkbox-label input {
+    display: none;
+}
+.perm-check-box {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    background: #fff;
+}
+.perm-checkbox-label input:checked + .perm-check-box {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+.perm-checkbox-label input:checked + .perm-check-box::after {
+    content: "✓";
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+}
+.perm-check-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+}
+@media (max-width: 768px) {
+    .permissions-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .perm-checkbox-label {
+        padding: 10px;
+    }
+    .perm-check-text {
+        font-size: 12px;
+    }
+}
+</style>
+
+<script>
+// Embed permissions data from server
+const rolePermissions = {{ all_perms|tojson }};
+
+function openEditModal(id, name, email, role, phone) {
+    document.getElementById('editWorkerForm').action = '/workers/edit/' + id;
+    document.getElementById('editWorkerId').value = id;
+    document.getElementById('editName').value = name;
+    document.getElementById('editEmail').value = email;
+    document.getElementById('editRole').value = role;
+    document.getElementById('editPhone').value = phone || '';
+    document.getElementById('editPassword').value = '';
+
+    updateEditPermissions();
+    openModal('editWorkerModal');
+}
+
+function updateEditPermissions() {
+    const role = document.getElementById('editRole').value;
+    const perms = rolePermissions[role] || [];
+
+    document.querySelectorAll('.perm-check').forEach(cb => {
+        cb.checked = perms.includes(cb.dataset.section);
+    });
+}
+</script>
 {% endblock %}

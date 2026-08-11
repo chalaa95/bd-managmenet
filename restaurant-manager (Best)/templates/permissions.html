@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Permissions - Restaurant Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🔐 Role Permissions</h1>
+        <p class="dash-date">Control which sections each role can access</p>
+    </div>
+    <a href="/workers" class="btn btn-secondary">← Back to Workers</a>
+</div>
+
+<form action="/permissions" method="POST">
+    <div class="card">
+        <div class="card-header">
+            <h2>Access Control Matrix</h2>
+            <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table permissions-table">
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        {% for role in roles %}
+                        <th style="text-align:center;">
+                            <span class="badge badge-{{ role|lower }}">{{ role }}</span>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for section_key, section_label in sections %}
+                    <tr>
+                        <td><strong>{{ section_label }}</strong></td>
+                        {% for role in roles %}
+                        <td style="text-align:center;">
+                            <label class="perm-checkbox">
+                                <input type="checkbox" name="perm_{{ role }}_{{ section_key }}"
+                                    {% if (role, section_key) in perms %}checked{% endif %}
+                                    {% if role == 'Manager' and section_key == 'dashboard' %}disabled checked{% endif %}>
+                                <span class="checkmark"></span>
+                            </label>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding: 20px 26px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 13px; color: #64748b; margin: 0;">
+                💡 <strong>Tip:</strong> Manager always has Dashboard access. Be careful removing permissions — a role with no permissions won't see any menu items.
+            </p>
+        </div>
+    </div>
+</form>
+
+<style>
+.permissions-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.perm-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    position: relative;
+}
+.perm-checkbox input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.checkmark {
+    width: 22px;
+    height: 22px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    background: #fff;
+}
+.perm-checkbox input:checked + .checkmark {
+    background: #2563eb;
+    border-color: #2563eb;
+}
+.perm-checkbox input:checked + .checkmark::after {
+    content: "✓";
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+}
+.perm-checkbox input:disabled + .checkmark {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    opacity: 0.6;
+}
+.perm-checkbox input:disabled + .checkmark::after {
+    content: "✓";
+    color: #94a3b8;
+}
+@media (max-width: 768px) {
+    .permissions-table th,
+    .permissions-table td {
+        padding: 10px 8px !important;
+        font-size: 12px;
+    }
+    .perm-checkbox {
+        width: 36px;
+        height: 36px;
+    }
+    .checkmark {
+        width: 20px;
+        height: 20px;
+    }
+}
+</style>
+{% endblock %}

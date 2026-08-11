@@ -34,7 +34,7 @@ def manager_only(f):
             return redirect(url_for('login'))
         if session.get('user_role') != 'Manager':
             flash('Access denied. Manager only.', 'error')
-            return redirect('/')
+            return redirect(get_first_allowed_route(session.get('user_role')))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -45,9 +45,82 @@ def manager_or_chef(f):
             return redirect(url_for('login'))
         if session.get('user_role') not in ['Manager', 'Chef']:
             flash('Access denied. Insufficient permissions.', 'error')
-            return redirect('/')
+            return redirect(get_first_allowed_route(session.get('user_role')))
         return f(*args, **kwargs)
     return decorated_function
+
+# ==================== PERMISSIONS SYSTEM ====================
+
+def get_role_permissions(role):
+    """Get list of section names a role can access"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT section FROM role_permissions WHERE role = ?", (role,))
+    perms = [row['section'] for row in cursor.fetchall()]
+    conn.close()
+    return perms
+
+def has_permission(role, section):
+    """Check if a role has access to a section"""
+    return section in get_role_permissions(role)
+
+def require_permission(section):
+    """Decorator to check if user's role has permission for a section"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('login'))
+            role = session.get('user_role')
+            if not has_permission(role, section):
+                flash('Access denied. You do not have permission for this section.', 'error')
+                return redirect(get_first_allowed_route(role))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.route('/sw.js')
+def service_worker():
+    return app.send_static_file('sw.js')
+
+@app.route('/permissions', methods=['GET', 'POST'])
+@manager_only
+def manage_permissions():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        cursor.execute("DELETE FROM role_permissions")
+        for key in request.form:
+            if key.startswith('perm_'):
+                parts = key.split('_', 2)
+                if len(parts) == 3:
+                    role = parts[1]
+                    section = parts[2]
+                    cursor.execute(
+                        "INSERT INTO role_permissions (role, section) VALUES (?, ?)",
+                        (role, section)
+                    )
+        conn.commit()
+        flash('Permissions updated successfully!', 'success')
+        conn.close()
+        return redirect(url_for('workers'))
+
+    roles = ['Manager', 'Chef', 'Waiter', 'Cashier']
+    cursor.execute("SELECT role, section FROM role_permissions")
+    perms = {(row['role'], row['section']) for row in cursor.fetchall()}
+    conn.close()
+
+    sections = [
+        ('dashboard', '📊 Dashboard'),
+        ('sales', '🛒 Sales / POS'),
+        ('products', '🍕 Products'),
+        ('storage', '📦 Storage'),
+        ('pre_products', '🥣 Pre-Products'),
+        ('purchases', '🚚 Purchases'),
+        ('workers', '👥 Workers'),
+    ]
+    return render_template('permissions.html', roles=roles, perms=perms, sections=sections)
 
 # ==================== CONTEXT & SESSION ====================
 @app.context_processor
@@ -61,7 +134,7 @@ def inject_user():
         conn.close()
         if row:
             user = dict(row)
-    return dict(current_user=user)
+    return dict(current_user=user, get_role_permissions=get_role_permissions)
 
 @app.before_request
 def load_user():
@@ -203,7 +276,7 @@ def init_db():
     )
     """)
 
-    # Pre-Product Recipes (what articles go into a pre-product)
+    # Pre-Product Recipes
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS pre_product_recipes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,7 +288,7 @@ def init_db():
     )
     """)
 
-    # Product Pre-Products (final products can use pre-products)
+    # Product Pre-Products
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS product_pre_products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -238,6 +311,15 @@ def init_db():
         unit_price REAL,
         total REAL,
         FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+    )
+    """)
+
+    # Role Permissions
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS role_permissions (
+        role TEXT NOT NULL,
+        section TEXT NOT NULL,
+        PRIMARY KEY (role, section)
     )
     """)
 
@@ -270,7 +352,6 @@ def migrate_db():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Check if password column exists in users
     cursor.execute("PRAGMA table_info(users)")
     columns = [row['name'] for row in cursor.fetchall()]
 
@@ -280,7 +361,6 @@ def migrate_db():
         cursor.execute("UPDATE users SET password = ?", (default_hash,))
         print("Migrated: added password column to users")
 
-    # Check if categories table exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'")
     if not cursor.fetchone():
         cursor.execute("""
@@ -297,7 +377,31 @@ def migrate_db():
         cursor.execute("INSERT INTO categories (name) VALUES (?)", ('Other',))
         print("Migrated: created categories table")
 
-    # Ensure default Manager exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='role_permissions'")
+    if not cursor.fetchone():
+        cursor.execute("""
+        CREATE TABLE role_permissions (
+            role TEXT NOT NULL,
+            section TEXT NOT NULL,
+            PRIMARY KEY (role, section)
+        )
+        """)
+        print("Migrated: created role_permissions table")
+
+    # Seed default permissions if table is empty
+    cursor.execute("SELECT COUNT(*) FROM role_permissions")
+    if cursor.fetchone()[0] == 0:
+        defaults = [
+            ('Manager', 'dashboard'), ('Manager', 'sales'), ('Manager', 'products'),
+            ('Manager', 'storage'), ('Manager', 'pre_products'), ('Manager', 'purchases'), ('Manager', 'workers'),
+            ('Chef', 'dashboard'), ('Chef', 'sales'), ('Chef', 'products'),
+            ('Chef', 'storage'), ('Chef', 'pre_products'), ('Chef', 'purchases'),
+            ('Waiter', 'dashboard'), ('Waiter', 'sales'),
+            ('Cashier', 'dashboard'), ('Cashier', 'sales'),
+        ]
+        cursor.executemany('INSERT INTO role_permissions (role, section) VALUES (?, ?)', defaults)
+        print("Migrated: seeded default role permissions")
+
     cursor.execute("SELECT * FROM users WHERE role = 'Manager' LIMIT 1")
     if not cursor.fetchone():
         manager_hash = generate_password_hash('admin')
@@ -319,7 +423,6 @@ def seed_data():
     chef_hash = generate_password_hash('123456')
     waiter_hash = generate_password_hash('123456')
 
-    # Workers
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
         ('Manager', 'manager@restaurant.com', 'Manager', '555-0100', manager_hash))
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
@@ -327,14 +430,12 @@ def seed_data():
     cursor.execute("INSERT INTO users (name, email, role, phone, password) VALUES (?, ?, ?, ?, ?)",
         ('Sarah Jones', 'sarah@restaurant.com', 'Waiter', '555-0102', waiter_hash))
 
-    # Categories
     cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Food',))
     cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Drinks',))
     cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Desserts',))
     cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Sides',))
     cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", ('Other',))
 
-    # Articles
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
         ('Flour', 'kg', 50, 2.5, 10, 'Storage Room'))
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
@@ -350,7 +451,6 @@ def seed_data():
     cursor.execute("INSERT INTO articles (name, unit, stock_qty, avg_cost, min_stock, location) VALUES (?, ?, ?, ?, ?, ?)",
         ('Orange', 'kg', 25, 2.0, 5, 'Fridge'))
 
-    # Products
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
         ('Margherita Pizza', 'Classic tomato and mozzarella', 12.99, 'Food'))
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
@@ -362,19 +462,16 @@ def seed_data():
     cursor.execute("INSERT INTO products (name, description, price, category) VALUES (?, ?, ?, ?)",
         ('Orange Juice', 'Freshly squeezed', 4.99, 'Drinks'))
 
-    # Pre-Products
     cursor.execute("INSERT INTO pre_products (name, unit, yield_qty) VALUES (?, ?, ?)",
         ('Mayonnaise', 'kg', 8))
     cursor.execute("INSERT INTO pre_products (name, unit, yield_qty) VALUES (?, ?, ?)",
         ('Tomato Sauce Base', 'L', 5))
 
-    # Pre-Product Recipes
     cursor.execute("INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 1, 4))
     cursor.execute("INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 3, 10))
     cursor.execute("INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (2, 3, 2))
     cursor.execute("INSERT INTO pre_product_recipes (pre_product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (2, 3, 0.5))
 
-    # Recipes (BOM)
     cursor.execute("INSERT INTO product_recipes (product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 1, 0.3))
     cursor.execute("INSERT INTO product_recipes (product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 2, 0.2))
     cursor.execute("INSERT INTO product_recipes (product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (1, 3, 0.1))
@@ -383,13 +480,22 @@ def seed_data():
     cursor.execute("INSERT INTO product_recipes (product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (4, 6, 1))
     cursor.execute("INSERT INTO product_recipes (product_id, article_id, quantity_needed) VALUES (?, ?, ?)", (5, 7, 0.3))
 
-    # Product using Pre-Products
     cursor.execute("INSERT INTO product_pre_products (product_id, pre_product_id, quantity_needed) VALUES (?, ?, ?)", (3, 1, 0.1))
+
+    # Seed default permissions
+    defaults = [
+        ('Manager', 'dashboard'), ('Manager', 'sales'), ('Manager', 'products'),
+        ('Manager', 'storage'), ('Manager', 'pre_products'), ('Manager', 'purchases'), ('Manager', 'workers'),
+        ('Chef', 'dashboard'), ('Chef', 'sales'), ('Chef', 'products'),
+        ('Chef', 'storage'), ('Chef', 'pre_products'), ('Chef', 'purchases'),
+        ('Waiter', 'dashboard'), ('Waiter', 'sales'),
+        ('Cashier', 'dashboard'), ('Cashier', 'sales'),
+    ]
+    cursor.executemany('INSERT OR IGNORE INTO role_permissions (role, section) VALUES (?, ?)', defaults)
 
     conn.commit()
     conn.close()
 
-# Initialize on startup
 migrate_if_needed()
 migrate_db()
 
@@ -411,7 +517,7 @@ def login():
             session['user_role'] = user['role']
             session['user_name'] = user['name']
             flash(f'Welcome back, {user["name"]}!', 'success')
-            return redirect('/')
+            return redirect(get_first_allowed_route(user['role']))
         else:
             flash('Invalid email or password.', 'error')
 
@@ -425,11 +531,8 @@ def logout():
 
 # ==================== HELPERS ====================
 def get_product_cost(product_id):
-    """Calculate total product cost from articles + pre-products"""
     conn = get_db()
     cursor = conn.cursor()
-
-    # Direct articles cost
     cursor.execute("""
         SELECT SUM(pr.quantity_needed * a.avg_cost) as total_cost
         FROM product_recipes pr
@@ -438,7 +541,6 @@ def get_product_cost(product_id):
     """, (product_id,))
     article_cost = cursor.fetchone()['total_cost'] or 0
 
-    # Pre-products cost
     cursor.execute("""
         SELECT ppp.quantity_needed, pp.yield_qty,
             (SELECT SUM(ppr.quantity_needed * a.avg_cost)
@@ -474,7 +576,6 @@ def get_product_recipe(product_id):
     return recipe
 
 def get_pre_product_cost(pre_product_id):
-    """Calculate cost per unit of a pre-product"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -516,12 +617,34 @@ def get_product_pre_products(product_id):
     conn.close()
     return items
 
+# ==================== HELPERS ====================
+def get_first_allowed_route(role):
+    """Get the first section a role has permission for"""
+    perms = get_role_permissions(role)
+    section_routes = [
+        ('dashboard', '/'),
+        ('sales', '/sales'),
+        ('products', '/products'),
+        ('storage', '/storage'),
+        ('pre_products', '/pre-products'),
+        ('purchases', '/purchases'),
+        ('workers', '/workers'),
+    ]
+    for section, route in section_routes:
+        if section in perms:
+            return route
+    return '/'
+
 # ==================== DASHBOARD ====================
 @app.route('/')
 @login_required
 def dashboard():
     conn = get_db()
     cursor = conn.cursor()
+    # If user doesn't have dashboard permission, redirect to first allowed section
+    if not has_permission(session.get('user_role'), 'dashboard'):
+        return redirect(get_first_allowed_route(session.get('user_role')))
+
     today = date.today().isoformat()
 
     cursor.execute("SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM sales WHERE DATE(created_at) = ?", (today,))
@@ -580,7 +703,7 @@ def dashboard():
 
 # ==================== PRODUCTS ====================
 @app.route('/products')
-@login_required
+@require_permission('products')
 def products():
     conn = get_db()
     cursor = conn.cursor()
@@ -604,7 +727,6 @@ def products():
     cursor.execute("SELECT * FROM categories ORDER BY name")
     categories = rows_to_dict(cursor.fetchall())
 
-    # Fetch recipes for edit modal
     cursor.execute("SELECT product_id, article_id, quantity_needed FROM product_recipes")
     all_recipes = rows_to_dict(cursor.fetchall())
     product_recipes_map = {}
@@ -640,7 +762,6 @@ def add_product():
         float(request.form['price']), request.form.get('category', 'Food')))
     product_id = cursor.lastrowid
 
-    # Add direct article components
     article_ids = request.form.getlist('recipe_article_id[]')
     quantities = request.form.getlist('recipe_qty[]')
     for i, aid in enumerate(article_ids):
@@ -650,7 +771,6 @@ def add_product():
                 VALUES (?, ?, ?)
             """, (product_id, int(aid), float(quantities[i])))
 
-    # Add pre-product components
     pre_product_ids = request.form.getlist('recipe_pre_product_id[]')
     pre_quantities = request.form.getlist('recipe_pre_qty[]')
     for i, pid in enumerate(pre_product_ids):
@@ -684,18 +804,15 @@ def edit_product(id):
     conn = get_db()
     cursor = conn.cursor()
 
-    # Update product info
     cursor.execute("""
         UPDATE products SET name = ?, description = ?, price = ?, category = ?
         WHERE id = ?
     """, (request.form['name'], request.form.get('description', ''),
         float(request.form['price']), request.form.get('category', 'Food'), id))
 
-    # Clear old recipes
     cursor.execute("DELETE FROM product_recipes WHERE product_id = ?", (id,))
     cursor.execute("DELETE FROM product_pre_products WHERE product_id = ?", (id,))
 
-    # Add new article components
     article_ids = request.form.getlist('recipe_article_id[]')
     quantities = request.form.getlist('recipe_qty[]')
     for i, aid in enumerate(article_ids):
@@ -705,7 +822,6 @@ def edit_product(id):
                 VALUES (?, ?, ?)
             """, (id, int(aid), float(quantities[i])))
 
-    # Add new pre-product components
     pre_product_ids = request.form.getlist('recipe_pre_product_id[]')
     pre_quantities = request.form.getlist('recipe_pre_qty[]')
     for i, pid in enumerate(pre_product_ids):
@@ -752,7 +868,6 @@ def delete_category(id):
         return redirect('/products')
 
     cat_name = row['name']
-    # Check if any products use this category
     cursor.execute("SELECT COUNT(*) FROM products WHERE category = ?", (cat_name,))
     count = cursor.fetchone()[0]
     if count > 0:
@@ -768,7 +883,7 @@ def delete_category(id):
 
 # ==================== STORAGE / ARTICLES ====================
 @app.route('/storage')
-@login_required
+@require_permission('storage')
 def storage():
     conn = get_db()
     cursor = conn.cursor()
@@ -797,7 +912,6 @@ def update_article(id):
 def delete_article(id):
     conn = get_db()
     cursor = conn.cursor()
-    # Check if article is used in any recipes
     cursor.execute("SELECT COUNT(*) FROM product_recipes WHERE article_id = ?", (id,))
     count = cursor.fetchone()[0]
     if count > 0:
@@ -811,7 +925,7 @@ def delete_article(id):
 
 # ==================== SALES / POS ====================
 @app.route('/sales')
-@login_required
+@require_permission('sales')
 def sales():
     conn = get_db()
     cursor = conn.cursor()
@@ -867,7 +981,6 @@ def create_sale():
                     'total': item_total
                 })
 
-            # Deduct direct recipe components (articles)
             cursor.execute("""
                 SELECT pr.quantity_needed, pr.article_id, a.stock_qty
                 FROM product_recipes pr
@@ -884,7 +997,6 @@ def create_sale():
                     UPDATE articles SET stock_qty = ? WHERE id = ?
                 """, (new_qty, comp['article_id']))
 
-            # Deduct pre-product components (explode BOM to raw materials)
             cursor.execute("""
                 SELECT ppp.quantity_needed, ppp.pre_product_id, pp.yield_qty
                 FROM product_pre_products ppp
@@ -964,7 +1076,7 @@ def delete_sale(id):
 
 # ==================== PURCHASES ====================
 @app.route('/purchases')
-@manager_or_chef
+@require_permission('purchases')
 def purchases():
     conn = get_db()
     cursor = conn.cursor()
@@ -977,7 +1089,6 @@ def purchases():
     """)
     purchases = rows_to_dict(cursor.fetchall())
 
-    # Fetch all purchase items grouped by purchase_id for detail view
     cursor.execute("SELECT * FROM purchase_items ORDER BY purchase_id, id")
     all_items = rows_to_dict(cursor.fetchall())
     purchase_items_map = {}
@@ -1020,7 +1131,6 @@ def add_purchase():
             price = float(prices[i])
             unit = units[i]
 
-            # Check if conversion is active for this item
             is_conv_active = (i < len(conv_active_flags) and conv_active_flags[i] == '1')
 
             if is_conv_active:
@@ -1028,7 +1138,6 @@ def add_purchase():
                 storage_unit = storage_units[i] if i < len(storage_units) and storage_units[i] else unit
                 storage_qty = qty * conv_factor
             else:
-                # No conversion: storage unit = purchase unit, storage qty = purchase qty
                 conv_factor = 1
                 storage_unit = unit
                 storage_qty = qty
@@ -1080,7 +1189,7 @@ def receive_purchase(id):
 
 # ==================== PRE-PRODUCTS ====================
 @app.route('/pre-products')
-@manager_or_chef
+@require_permission('pre_products')
 def pre_products():
     conn = get_db()
     cursor = conn.cursor()
@@ -1138,14 +1247,33 @@ def delete_pre_product(id):
 
 # ==================== WORKERS ====================
 @app.route('/workers')
-@manager_only
+@require_permission('workers')
 def workers():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
     workers = rows_to_dict(cursor.fetchall())
+
+    cursor.execute("SELECT role, section FROM role_permissions")
+    all_perms = {}
+    for row in cursor.fetchall():
+        if row['role'] not in all_perms:
+            all_perms[row['role']] = []
+        all_perms[row['role']].append(row['section'])
+
     conn.close()
-    return render_template('workers.html', workers=workers)
+
+    sections = [
+        ('dashboard', '📊 Dashboard'),
+        ('sales', '🛒 Sales / POS'),
+        ('products', '🍕 Products'),
+        ('storage', '📦 Storage'),
+        ('pre_products', '🥣 Pre-Products'),
+        ('purchases', '🚚 Purchases'),
+        ('workers', '👥 Workers'),
+    ]
+
+    return render_template('workers.html', workers=workers, all_perms=all_perms, sections=sections)
 
 @app.route('/workers/add', methods=['POST'])
 @manager_only
@@ -1161,6 +1289,43 @@ def add_worker():
     conn.commit()
     conn.close()
     flash('Worker added successfully!', 'success')
+    return redirect('/workers')
+
+@app.route('/workers/edit/<int:id>', methods=['POST'])
+@manager_only
+def edit_worker(id):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    name = request.form['name']
+    email = request.form.get('email', '')
+    role = request.form.get('role', 'Waiter')
+    phone = request.form.get('phone', '')
+
+    # Only update password if provided
+    password = request.form.get('password', '')
+    if password:
+        password_hash = generate_password_hash(password)
+        cursor.execute("""
+            UPDATE users SET name = ?, email = ?, role = ?, phone = ?, password = ?
+            WHERE id = ?
+        """, (name, email, role, phone, password_hash, id))
+    else:
+        cursor.execute("""
+            UPDATE users SET name = ?, email = ?, role = ?, phone = ?
+            WHERE id = ?
+        """, (name, email, role, phone, id))
+
+    # Update role permissions
+    cursor.execute("DELETE FROM role_permissions WHERE role = ?", (role,))
+    for key in request.form:
+        if key.startswith('perm_'):
+            section = key.split('_', 1)[1]
+            cursor.execute("INSERT INTO role_permissions (role, section) VALUES (?, ?)", (role, section))
+
+    conn.commit()
+    conn.close()
+    flash('Worker and role permissions updated!', 'success')
     return redirect('/workers')
 
 @app.route('/workers/delete/<int:id>')
